@@ -19,6 +19,15 @@ on:
           - bd
           - intl
           - research
+      fullscrape:
+        description: 'Run a full scrape (all sources, cap overrides)'
+        required: false
+        default: false
+        type: boolean
+
+concurrency:
+  group: drug-data-scrape-${{ github.ref }}
+  cancel-in-progress: false
 
 permissions:
   contents: write
@@ -47,8 +56,11 @@ jobs:
         env:
           SOURCES: ${{ github.event.inputs.sources }}
           CATEGORY: ${{ github.event.inputs.category || 'all' }}
+          FULLSCRAPE: ${{ github.event.inputs.fullscrape || 'false' }}
         run: |
-          if [ -n "$SOURCES" ]; then
+          if [ "$FULLSCRAPE" = "true" ]; then
+            python main.py scrape --fullscrape
+          elif [ -n "$SOURCES" ]; then
             IFS=',' read -ra SRC_ARRAY <<< "$SOURCES"
             python main.py scrape "${SRC_ARRAY[@]}"
           elif [ "$CATEGORY" = "bd" ]; then
@@ -58,7 +70,7 @@ jobs:
           elif [ "$CATEGORY" = "research" ]; then
             python main.py scrape --research
           else
-            python main.py scrape --all
+            python main.py scrape --fullscrape
           fi
 
       - name: Check for changes
@@ -77,7 +89,8 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           TIMESTAMP=$(date -u +"%Y-%m-%d %H:%M UTC")
-          git commit -m "data: update scraped drug data ($TIMESTAMP)"
+          git commit -m "data: daily drug refresh ($TIMESTAMP)"
+          git pull --rebase
           git push
 
       - name: Upload data artifacts
@@ -91,7 +104,7 @@ jobs:
   scrape-heavy:
     runs-on: ubuntu-latest
     timeout-minutes: 360
-    if: github.event.schedule == '0 2 * * 0'
+    if: github.event_name == 'schedule' && github.event.schedule == '0 2 * * 0'
 
     steps:
       - name: Checkout
@@ -110,7 +123,7 @@ jobs:
 
       - name: Run heavy scrapers
         run: |
-          python main.py scrape medex dims bdmedex arogga osudpotro drugs_com pubchem chembl
+          python main.py scrape --fullscrape medex dims bdmedex arogga osudpotro drugs_com pubchem chembl
 
       - name: Check for changes
         id: changes
@@ -129,4 +142,5 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           TIMESTAMP=$(date -u +"%Y-%m-%d %H:%M UTC")
           git commit -m "data: weekly full scrape update ($TIMESTAMP)"
+          git pull --rebase
           git push

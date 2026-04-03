@@ -1,10 +1,10 @@
 # MediScrape
 
-Comprehensive medicine database scraper for **26 sources** across Bangladesh and international drug databases. Uses [Scrapling](https://github.com/D4Vinci/Scrapling) for HTML scraping and `httpx` for REST APIs.
+Comprehensive medicine database scraper for **29 sources** across Bangladesh and international drug databases. Uses [Scrapling](https://github.com/D4Vinci/Scrapling) for HTML scraping and `httpx` for REST APIs.
 
 ## Sources
 
-### Bangladesh (10 scrapers)
+### Bangladesh (11 scrapers)
 
 | Source | URL | Data | Method |
 |--------|-----|------|--------|
@@ -18,6 +18,7 @@ Comprehensive medicine database scraper for **26 sources** across Bangladesh and
 | MedEasy | medeasy.health | Online pharmacy | Stealth + API discovery |
 | Osudpotro | osudpotro.com | 7 lakh+ items | Stealth + `__NEXT_DATA__` JSON |
 | Lazz Pharma | lazzpharma.com | Online pharmacy | Stealth + WooCommerce/JSON-LD |
+| DGHS SHR | fhir.dghs.gov.bd | FHIR medication terminology + optional live Medication feed | API (FHIR/JSON) |
 
 ### International APIs (7 scrapers)
 
@@ -31,7 +32,7 @@ Comprehensive medicine database scraper for **26 sources** across Bangladesh and
 | KEGG DRUG | genome.jp/kegg/drug | Approved drugs, pathways | Free REST API |
 | EMA | ema.europa.eu | EU-authorized medicines | Static JSON dumps |
 
-### International Scraping (6 scrapers)
+### International Scraping (8 scrapers)
 
 | Source | URL | Data | Method |
 |--------|-----|------|--------|
@@ -41,6 +42,8 @@ Comprehensive medicine database scraper for **26 sources** across Bangladesh and
 | eMC (UK) | medicines.org.uk/emc | 9k+ UK medicines (SmPC) | Stealth + sitemap |
 | MIMS (Asia) | mims.com | Asia-Pacific drug reference | Stealth |
 | WHO EML | list.essentialmeds.org | 523 essential medications | Scrapling |
+| Medscape | reference.medscape.com | 7k+ monographs, dosing, interactions | Scrapling + JSON-LD |
+| Epocrates | epocrates.com | 7k+ drugs, classes, dosing cards | API + monograph scraping |
 
 ### Research (3 scrapers)
 
@@ -69,10 +72,14 @@ python main.py list
 python main.py scrape medex openfda kegg
 
 # Scrape by category
-python main.py scrape --bd        # Bangladesh only (10)
-python main.py scrape --intl      # International only (13)
+python main.py scrape --bd        # Bangladesh only (11)
+python main.py scrape --intl      # International only (15)
 python main.py scrape --research  # Research only (3)
-python main.py scrape --all       # All 26 sources
+python main.py scrape --all       # All 29 sources
+python main.py scrape --fullscrape  # Full run (all sources, cap overrides)
+
+# Full run for selected heavy sources
+python main.py scrape --fullscrape medex dims bdmedex
 
 # Check which sources have new data
 python main.py check
@@ -120,10 +127,10 @@ Output is saved as JSON in `data/<source>/drugs.json`.
 ## GitHub Actions
 
 The included workflow (`.github/workflows/scrape.yml`) runs:
-- **Daily** at 2 AM UTC: all scrapers
+- **Daily** at 2 AM UTC: full scrape of all sources
 - **Weekly** (Sundays): heavy scrapers with 25k+ drugs
 - Auto-commits only when data changes (SHA256 checksums)
-- Manual trigger with source/category selection
+- Manual trigger with source/category selection and `fullscrape` toggle
 
 ## Architecture
 
@@ -133,8 +140,8 @@ mediscrape/
 ├── models/drug.py              # Pydantic Drug model (80+ fields)
 ├── scrapers/
 │   ├── base.py                 # BaseScraper, BaseAPIScraper, BaseScrapingScraper
-│   ├── bangladesh/             # 10 BD scrapers
-│   ├── international/          # 13 international scrapers (7 API + 6 scraping)
+│   ├── bangladesh/             # 11 BD scrapers
+│   ├── international/          # 15 international scrapers (7 API + 8 scraping)
 │   └── research/               # 3 research/academic scrapers
 ├── utils/
 │   ├── storage.py              # JSON file I/O

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
-import json
+import inspect
 import logging
 import time
 from abc import ABC, abstractmethod
@@ -61,6 +61,7 @@ class BaseScraper(ABC):
         start = time.time()
         meta = ScrapeMeta(source=self.name)
         drugs: list[Drug] = []
+        scrape_failed = False
 
         try:
             async for drug in self.scrape_all():
@@ -71,24 +72,38 @@ class BaseScraper(ABC):
         except Exception as e:
             logger.error(f"[{self.name}] Error during scraping: {e}")
             meta.errors += 1
+            scrape_failed = True
+        finally:
+            await self._cleanup_resources()
 
         meta.duration_seconds = time.time() - start
 
-        # Save drugs
+        # Save drugs. If scraping failed before collecting any records, preserve
+        # existing data instead of replacing it with an empty file.
         output_file = self.data_dir / "drugs.json"
         old_checksum = self._file_checksum(output_file)
+        if scrape_failed and not drugs:
+            meta.checksum = old_checksum
+            if old_checksum:
+                logger.warning(
+                    f"[{self.name}] Scrape failed with no data; preserving existing drugs.json"
+                )
+            else:
+                logger.warning(
+                    f"[{self.name}] Scrape failed with no data; skipping drugs.json write"
+                )
+        else:
+            data = [
+                orjson.loads(d.to_json_bytes())
+                for d in drugs
+            ]
+            output_file.write_bytes(orjson.dumps(data, option=orjson.OPT_INDENT_2))
 
-        data = [
-            orjson.loads(d.to_json_bytes())
-            for d in drugs
-        ]
-        output_file.write_bytes(orjson.dumps(data, option=orjson.OPT_INDENT_2))
+            new_checksum = self._file_checksum(output_file)
+            meta.checksum = new_checksum
 
-        new_checksum = self._file_checksum(output_file)
-        meta.checksum = new_checksum
-
-        if old_checksum and old_checksum != new_checksum:
-            logger.info(f"[{self.name}] Data changed! Old: {old_checksum[:8]}, New: {new_checksum[:8]}")
+            if old_checksum and old_checksum != new_checksum:
+                logger.info(f"[{self.name}] Data changed! Old: {old_checksum[:8]}, New: {new_checksum[:8]}")
 
         # Save metadata
         meta_file = self.data_dir / "meta.json"
@@ -98,6 +113,27 @@ class BaseScraper(ABC):
             f"[{self.name}] Done: {meta.total_drugs} drugs in {meta.duration_seconds:.1f}s"
         )
         return meta
+
+    async def _cleanup_resources(self):
+        await self._close_resource(getattr(self, "client", None), "client")
+        await self._close_resource(getattr(self, "fetcher", None), "fetcher")
+
+    async def _close_resource(self, resource, label: str):
+        if resource is None:
+            return
+
+        close_fn = getattr(resource, "aclose", None)
+        if not callable(close_fn):
+            close_fn = getattr(resource, "close", None)
+        if not callable(close_fn):
+            return
+
+        try:
+            result = close_fn()
+            if inspect.isawaitable(result):
+                await result
+        except Exception as e:
+            logger.debug(f"[{self.name}] Failed to close {label}: {e}", exc_info=True)
 
     @staticmethod
     def _file_checksum(path: Path) -> str | None:

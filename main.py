@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 import sys
 from pathlib import Path
 
@@ -24,6 +25,7 @@ from scrapers.bangladesh.arogga import AroggaScraper
 from scrapers.bangladesh.medeasy import MedEasyScraper
 from scrapers.bangladesh.osudpotro import OsudpotroScraper
 from scrapers.bangladesh.lazzpharma import LazzPharmaScraper
+from scrapers.bangladesh.dghs_shr import DGHSSHRScraper
 
 # International API scrapers
 from scrapers.international.openfda import OpenFDAScraper
@@ -41,6 +43,8 @@ from scrapers.international.webmd import WebMDScraper
 from scrapers.international.emc import EMCScraper
 from scrapers.international.mims import MIMSScraper
 from scrapers.international.who_eml import WHOEMLScraper
+from scrapers.international.medscape import MedscapeScraper
+from scrapers.international.epocrates import EpocratesScraper
 
 # Research scrapers
 from scrapers.research.drugbank import DrugBankScraper
@@ -63,6 +67,7 @@ ALL_SCRAPERS = {
     "medeasy": MedEasyScraper,
     "osudpotro": OsudpotroScraper,
     "lazzpharma": LazzPharmaScraper,
+    "dghs_shr": DGHSSHRScraper,
     # International APIs
     "openfda": OpenFDAScraper,
     "rxnorm": RxNormScraper,
@@ -78,6 +83,8 @@ ALL_SCRAPERS = {
     "emc": EMCScraper,
     "mims": MIMSScraper,
     "who_eml": WHOEMLScraper,
+    "medscape": MedscapeScraper,
+    "epocrates": EpocratesScraper,
     # Research
     "drugbank": DrugBankScraper,
     "pharmgkb": PharmGKBScraper,
@@ -86,12 +93,12 @@ ALL_SCRAPERS = {
 
 BD_SCRAPERS = [
     "medex", "dims", "dgda", "bdmedex", "bddrugs",
-    "bddrugstore", "arogga", "medeasy", "osudpotro", "lazzpharma",
+    "bddrugstore", "arogga", "medeasy", "osudpotro", "lazzpharma", "dghs_shr",
 ]
 INTL_SCRAPERS = [
     "openfda", "rxnorm", "dailymed", "pubchem", "chembl",
     "kegg", "ema", "drugs_com", "rxlist", "webmd",
-    "emc", "mims", "who_eml",
+    "emc", "mims", "who_eml", "medscape", "epocrates",
 ]
 RESEARCH_SCRAPERS = ["drugbank", "pharmgkb", "clincalc"]
 
@@ -115,11 +122,20 @@ def cli(verbose: bool):
 @cli.command()
 @click.argument("sources", nargs=-1)
 @click.option("--all", "run_all", is_flag=True, help="Run all scrapers")
+@click.option("--fullscrape", is_flag=True, help="Disable source caps; if used alone, runs all sources")
 @click.option("--bd", is_flag=True, help="Run Bangladesh scrapers only")
 @click.option("--intl", is_flag=True, help="Run international scrapers only")
 @click.option("--research", is_flag=True, help="Run research scrapers only")
 @click.option("--data-dir", type=Path, default=Path("data"), help="Output directory")
-def scrape(sources: tuple, run_all: bool, bd: bool, intl: bool, research: bool, data_dir: Path):
+def scrape(
+    sources: tuple,
+    run_all: bool,
+    fullscrape: bool,
+    bd: bool,
+    intl: bool,
+    research: bool,
+    data_dir: Path,
+):
     """Run scrapers for specified sources."""
     if run_all:
         selected = list(ALL_SCRAPERS.keys())
@@ -131,8 +147,10 @@ def scrape(sources: tuple, run_all: bool, bd: bool, intl: bool, research: bool, 
         selected = RESEARCH_SCRAPERS
     elif sources:
         selected = list(sources)
+    elif fullscrape:
+        selected = list(ALL_SCRAPERS.keys())
     else:
-        console.print("[red]Specify sources, or use --all, --bd, --intl, --research[/red]")
+        console.print("[red]Specify sources, or use --all, --fullscrape, --bd, --intl, --research[/red]")
         sys.exit(1)
 
     invalid = [s for s in selected if s not in ALL_SCRAPERS]
@@ -140,7 +158,22 @@ def scrape(sources: tuple, run_all: bool, bd: bool, intl: bool, research: bool, 
         console.print(f"[red]Unknown sources: {', '.join(invalid)}[/red]")
         sys.exit(1)
 
+    if fullscrape:
+        _enable_fullscrape_mode()
+
     asyncio.run(_run_scrapers(selected, data_dir))
+
+
+def _enable_fullscrape_mode():
+    """Force scraper cap env vars off for true full-dataset runs."""
+    cap_env_vars = [
+        "EPOCRATES_MAX_DRUGS",
+        "MEDSCAPE_MAX_DRUGS",
+        "DGHS_SHR_MAX_MEDICATIONS",
+    ]
+    for var in cap_env_vars:
+        os.environ[var] = "0"
+    logging.info("Full scrape mode enabled: source caps disabled.")
 
 
 async def _run_scrapers(sources: list[str], data_dir: Path):
@@ -198,14 +231,16 @@ def list_sources():
     table.add_column("Category")
     table.add_column("Type")
 
-    for name in BD_SCRAPERS:
-        table.add_row(name, "Bangladesh", "scraping")
-    for name in INTL_SCRAPERS:
+    def scraper_type(name: str) -> str:
         cls = ALL_SCRAPERS[name]
-        stype = "API" if "API" in cls.__bases__[0].__name__ else "scraping"
-        table.add_row(name, "International", stype)
+        return "API" if any("API" in base.__name__ for base in cls.__mro__) else "scraping"
+
+    for name in BD_SCRAPERS:
+        table.add_row(name, "Bangladesh", scraper_type(name))
+    for name in INTL_SCRAPERS:
+        table.add_row(name, "International", scraper_type(name))
     for name in RESEARCH_SCRAPERS:
-        table.add_row(name, "Research", "scraping/API")
+        table.add_row(name, "Research", scraper_type(name))
 
     console.print(table)
 

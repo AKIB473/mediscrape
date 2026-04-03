@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import orjson
-from datetime import datetime
+from datetime import datetime, timezone
 from pydantic import BaseModel, Field
 
 
@@ -141,7 +141,7 @@ class Drug(BaseModel):
 
 class ScrapeMeta(BaseModel):
     source: str
-    scraped_at: datetime = Field(default_factory=datetime.utcnow)
+    scraped_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     total_drugs: int = 0
     new_drugs: int = 0
     updated_drugs: int = 0
