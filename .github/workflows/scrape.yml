@@ -50,6 +50,7 @@ jobs:
       - name: Install dependencies
         run: |
           pip install -e .
+          pip install playwright
           python -m playwright install chromium
 
       - name: Run scrapers
@@ -119,6 +120,7 @@ jobs:
       - name: Install dependencies
         run: |
           pip install -e .
+          pip install playwright
           python -m playwright install chromium
 
       - name: Run heavy scrapers
