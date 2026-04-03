@@ -1,0 +1,132 @@
+name: Drug Data Scraper
+
+on:
+  schedule:
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+    inputs:
+      sources:
+        description: 'Comma-separated source names (empty = all)'
+        required: false
+        default: ''
+      category:
+        description: 'Category to scrape'
+        required: false
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - bd
+          - intl
+          - research
+
+permissions:
+  contents: write
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          pip install -e .
+          python -m playwright install chromium
+
+      - name: Run scrapers
+        env:
+          SOURCES: ${{ github.event.inputs.sources }}
+          CATEGORY: ${{ github.event.inputs.category || 'all' }}
+        run: |
+          if [ -n "$SOURCES" ]; then
+            IFS=',' read -ra SRC_ARRAY <<< "$SOURCES"
+            python main.py scrape "${SRC_ARRAY[@]}"
+          elif [ "$CATEGORY" = "bd" ]; then
+            python main.py scrape --bd
+          elif [ "$CATEGORY" = "intl" ]; then
+            python main.py scrape --intl
+          elif [ "$CATEGORY" = "research" ]; then
+            python main.py scrape --research
+          else
+            python main.py scrape --all
+          fi
+
+      - name: Check for changes
+        id: changes
+        run: |
+          git add data/
+          if git diff --cached --quiet; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Commit and push if changed
+        if: steps.changes.outputs.changed == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          TIMESTAMP=$(date -u +"%Y-%m-%d %H:%M UTC")
+          git commit -m "data: update scraped drug data ($TIMESTAMP)"
+          git push
+
+      - name: Upload data artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: drug-data-${{ github.run_number }}
+          path: data/
+          retention-days: 30
+
+  scrape-heavy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    if: github.event.schedule == '0 2 * * 0'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          pip install -e .
+          python -m playwright install chromium
+
+      - name: Run heavy scrapers
+        run: |
+          python main.py scrape medex dims bdmedex arogga osudpotro drugs_com pubchem chembl
+
+      - name: Check for changes
+        id: changes
+        run: |
+          git add data/
+          if git diff --cached --quiet; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Commit and push if changed
+        if: steps.changes.outputs.changed == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          TIMESTAMP=$(date -u +"%Y-%m-%d %H:%M UTC")
+          git commit -m "data: weekly full scrape update ($TIMESTAMP)"
+          git push

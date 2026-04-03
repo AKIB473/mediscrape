@@ -1,0 +1,13 @@
+__pycache__/
+*.pyc
+*.pyo
+.eggs/
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+data/
+*.json
+!pyproject.toml
+.env
