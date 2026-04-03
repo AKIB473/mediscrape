@@ -1,3 +1,7 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "drug-scraper"
 version = "1.0.0"
@@ -26,3 +30,7 @@ dev = [
 
 [project.scripts]
 drug-scraper = "main:cli"
+
+[tool.setuptools.packages.find]
+include = ["models*", "scrapers*", "utils*"]
+exclude = ["tests*", "data*"]
