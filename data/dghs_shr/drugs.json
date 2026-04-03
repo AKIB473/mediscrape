@@ -1,0 +1,182 @@
+[
+  {
+    "source": "dghs_shr",
+    "source_url": "https://fhir.dghs.gov.bd/core/CodeSystem-bd-medication-code.json",
+    "source_id": "394-0010-030",
+    "brand_name": "Tubutol",
+    "generic_name": "Ethambutol",
+    "description": "Ethambutol",
+    "categories": [
+      "Bangladesh Core FHIR",
+      "Medication"
+    ],
+    "extra": {
+      "dataset": "bd-core-terminology",
+      "code_system_url": "https://fhir.dghs.gov.bd/core/CodeSystem/bd-medication-code",
+      "code_system_version": "0.3.0",
+      "code_system_status": "draft",
+      "code_system_title": "Bangladesh Medication Codes",
+      "code_system_count": 6,
+      "value_set_url": "https://fhir.dghs.gov.bd/core/ValueSet/bd-medication-valueset",
+      "value_set_version": "0.3.0",
+      "value_set_status": "draft",
+      "medication_profile_url": "https://fhir.dghs.gov.bd/core/StructureDefinition/bd-medication",
+      "medication_request_profile_url": "https://fhir.dghs.gov.bd/core/StructureDefinition/bd-medication-request",
+      "concept": {
+        "code": "394-0010-030",
+        "display": "Tubutol",
+        "definition": "Ethambutol"
+      }
+    }
+  },
+  {
+    "source": "dghs_shr",
+    "source_url": "https://fhir.dghs.gov.bd/core/CodeSystem-bd-medication-code.json",
+    "source_id": "394-0011-030",
+    "brand_name": "AFDCDT-2",
+    "generic_name": "Isoniazid + Rifampicin",
+    "description": "Isoniazid + Rifampicin",
+    "categories": [
+      "Bangladesh Core FHIR",
+      "Medication"
+    ],
+    "extra": {
+      "dataset": "bd-core-terminology",
+      "code_system_url": "https://fhir.dghs.gov.bd/core/CodeSystem/bd-medication-code",
+      "code_system_version": "0.3.0",
+      "code_system_status": "draft",
+      "code_system_title": "Bangladesh Medication Codes",
+      "code_system_count": 6,
+      "value_set_url": "https://fhir.dghs.gov.bd/core/ValueSet/bd-medication-valueset",
+      "value_set_version": "0.3.0",
+      "value_set_status": "draft",
+      "medication_profile_url": "https://fhir.dghs.gov.bd/core/StructureDefinition/bd-medication",
+      "medication_request_profile_url": "https://fhir.dghs.gov.bd/core/StructureDefinition/bd-medication-request",
+      "concept": {
+        "code": "394-0011-030",
+        "display": "AFDCDT-2",
+        "definition": "Isoniazid + Rifampicin"
+      }
+    }
+  },
+  {
+    "source": "dghs_shr",
+    "source_url": "https://fhir.dghs.gov.bd/core/CodeSystem-bd-medication-code.json",
+    "source_id": "394-0012-030",
+    "brand_name": "AFDCDT-3",
+    "generic_name": "Isoniazid + Pyrazinamide + Rifampicin",
+    "description": "Isoniazid + Pyrazinamide + Rifampicin",
+    "categories": [
+      "Bangladesh Core FHIR",
+      "Medication"
+    ],
+    "extra": {
+      "dataset": "bd-core-terminology",
+      "code_system_url": "https://fhir.dghs.gov.bd/core/CodeSystem/bd-medication-code",
+      "code_system_version": "0.3.0",
+      "code_system_status": "draft",
+      "code_system_title": "Bangladesh Medication Codes",
+      "code_system_count": 6,
+      "value_set_url": "https://fhir.dghs.gov.bd/core/ValueSet/bd-medication-valueset",
+      "value_set_version": "0.3.0",
+      "value_set_status": "draft",
+      "medication_profile_url": "https://fhir.dghs.gov.bd/core/StructureDefinition/bd-medication",
+      "medication_request_profile_url": "https://fhir.dghs.gov.bd/core/StructureDefinition/bd-medication-request",
+      "concept": {
+        "code": "394-0012-030",
+        "display": "AFDCDT-3",
+        "definition": "Isoniazid + Pyrazinamide + Rifampicin"
+      }
+    }
+  },
+  {
+    "source": "dghs_shr",
+    "source_url": "https://fhir.dghs.gov.bd/core/CodeSystem-bd-medication-code.json",
+    "source_id": "394-0017-046",
+    "brand_name": "Levetiracetam 250",
+    "generic_name": "Levetiracetam",
+    "description": "Levetiracetam",
+    "categories": [
+      "Bangladesh Core FHIR",
+      "Medication"
+    ],
+    "extra": {
+      "dataset": "bd-core-terminology",
+      "code_system_url": "https://fhir.dghs.gov.bd/core/CodeSystem/bd-medication-code",
+      "code_system_version": "0.3.0",
+      "code_system_status": "draft",
+      "code_system_title": "Bangladesh Medication Codes",
+      "code_system_count": 6,
+      "value_set_url": "https://fhir.dghs.gov.bd/core/ValueSet/bd-medication-valueset",
+      "value_set_version": "0.3.0",
+      "value_set_status": "draft",
+      "medication_profile_url": "https://fhir.dghs.gov.bd/core/StructureDefinition/bd-medication",
+      "medication_request_profile_url": "https://fhir.dghs.gov.bd/core/StructureDefinition/bd-medication-request",
+      "concept": {
+        "code": "394-0017-046",
+        "display": "Levetiracetam 250",
+        "definition": "Levetiracetam"
+      }
+    }
+  },
+  {
+    "source": "dghs_shr",
+    "source_url": "https://fhir.dghs.gov.bd/core/CodeSystem-bd-medication-code.json",
+    "source_id": "394-0021-028",
+    "brand_name": "Donepezil Hydrochloride 5",
+    "generic_name": "Donepezil Hydrochloride",
+    "description": "Donepezil Hydrochloride",
+    "categories": [
+      "Bangladesh Core FHIR",
+      "Medication"
+    ],
+    "extra": {
+      "dataset": "bd-core-terminology",
+      "code_system_url": "https://fhir.dghs.gov.bd/core/CodeSystem/bd-medication-code",
+      "code_system_version": "0.3.0",
+      "code_system_status": "draft",
+      "code_system_title": "Bangladesh Medication Codes",
+      "code_system_count": 6,
+      "value_set_url": "https://fhir.dghs.gov.bd/core/ValueSet/bd-medication-valueset",
+      "value_set_version": "0.3.0",
+      "value_set_status": "draft",
+      "medication_profile_url": "https://fhir.dghs.gov.bd/core/StructureDefinition/bd-medication",
+      "medication_request_profile_url": "https://fhir.dghs.gov.bd/core/StructureDefinition/bd-medication-request",
+      "concept": {
+        "code": "394-0021-028",
+        "display": "Donepezil Hydrochloride 5",
+        "definition": "Donepezil Hydrochloride"
+      }
+    }
+  },
+  {
+    "source": "dghs_shr",
+    "source_url": "https://fhir.dghs.gov.bd/core/CodeSystem-bd-medication-code.json",
+    "source_id": "355-0065-023",
+    "brand_name": "Cefufine",
+    "generic_name": "Cefuroxime",
+    "description": "Cefuroxime",
+    "categories": [
+      "Bangladesh Core FHIR",
+      "Medication"
+    ],
+    "extra": {
+      "dataset": "bd-core-terminology",
+      "code_system_url": "https://fhir.dghs.gov.bd/core/CodeSystem/bd-medication-code",
+      "code_system_version": "0.3.0",
+      "code_system_status": "draft",
+      "code_system_title": "Bangladesh Medication Codes",
+      "code_system_count": 6,
+      "value_set_url": "https://fhir.dghs.gov.bd/core/ValueSet/bd-medication-valueset",
+      "value_set_version": "0.3.0",
+      "value_set_status": "draft",
+      "medication_profile_url": "https://fhir.dghs.gov.bd/core/StructureDefinition/bd-medication",
+      "medication_request_profile_url": "https://fhir.dghs.gov.bd/core/StructureDefinition/bd-medication-request",
+      "concept": {
+        "code": "355-0065-023",
+        "display": "Cefufine",
+        "definition": "Cefuroxime"
+      }
+    }
+  }
+]
