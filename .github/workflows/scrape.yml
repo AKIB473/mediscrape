@@ -33,9 +33,134 @@ permissions:
   contents: write
 
 jobs:
-  scrape:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.plan.outputs.matrix }}
+      use_fullscrape: ${{ steps.plan.outputs.use_fullscrape }}
+      selected_sources: ${{ steps.plan.outputs.selected_sources }}
+      shard_count: ${{ steps.plan.outputs.shard_count }}
+
+    steps:
+      - name: Build shard plan
+        id: plan
+        env:
+          INPUT_SOURCES: ${{ github.event.inputs.sources || '' }}
+          INPUT_CATEGORY: ${{ github.event.inputs.category || 'all' }}
+          INPUT_FULLSCRAPE: ${{ github.event.inputs.fullscrape || 'false' }}
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          import sys
+
+          ALL_SCRAPERS = [
+              'medex', 'dims', 'dgda', 'bdmedex', 'bddrugs',
+              'bddrugstore', 'arogga', 'medeasy', 'osudpotro', 'lazzpharma', 'dghs_shr',
+              'openfda', 'rxnorm', 'dailymed', 'pubchem', 'chembl',
+              'kegg', 'ema', 'drugs_com', 'rxlist', 'webmd',
+              'emc', 'mims', 'who_eml', 'medscape', 'epocrates',
+              'drugbank', 'pharmgkb', 'clincalc',
+          ]
+
+          CATEGORIES = {
+              'all': ALL_SCRAPERS,
+              'bd': [
+                  'medex', 'dims', 'dgda', 'bdmedex', 'bddrugs',
+                  'bddrugstore', 'arogga', 'medeasy', 'osudpotro', 'lazzpharma', 'dghs_shr',
+              ],
+              'intl': [
+                  'openfda', 'rxnorm', 'dailymed', 'pubchem', 'chembl',
+                  'kegg', 'ema', 'drugs_com', 'rxlist', 'webmd',
+                  'emc', 'mims', 'who_eml', 'medscape', 'epocrates',
+              ],
+              'research': ['drugbank', 'pharmgkb', 'clincalc'],
+          }
+
+          STEALTH_SOURCES = {
+              'drugbank', 'rxlist', 'drugs_com', 'mims', 'emc', 'webmd',
+              'osudpotro', 'medeasy', 'dgda', 'arogga', 'lazzpharma',
+          }
+
+          SHARDS = [
+              ('bd-medex', ['medex']),
+              ('bd-dims', ['dims']),
+              ('bd-bdmedex', ['bdmedex']),
+              ('bd-arogga', ['arogga']),
+              ('bd-osudpotro', ['osudpotro']),
+              ('bd-core', ['dgda', 'bddrugs', 'bddrugstore', 'medeasy', 'lazzpharma', 'dghs_shr']),
+              ('intl-api-1', ['openfda', 'rxnorm', 'dailymed']),
+              ('intl-api-2', ['pubchem', 'chembl']),
+              ('intl-api-3', ['kegg', 'ema']),
+              ('intl-scrape-1', ['drugs_com', 'rxlist']),
+              ('intl-scrape-2', ['webmd', 'emc', 'mims', 'who_eml']),
+              ('intl-medscape', ['medscape']),
+              ('intl-epocrates', ['epocrates']),
+              ('research', ['drugbank', 'pharmgkb', 'clincalc']),
+          ]
+
+          event_name = os.getenv('GITHUB_EVENT_NAME', '')
+          sources_input = (os.getenv('INPUT_SOURCES') or '').strip()
+          category = (os.getenv('INPUT_CATEGORY') or 'all').strip().lower()
+          fullscrape = (os.getenv('INPUT_FULLSCRAPE') or 'false').strip().lower() == 'true'
+
+          if event_name == 'schedule':
+              selected = list(ALL_SCRAPERS)
+              use_fullscrape = True
+          else:
+              if sources_input:
+                  selected = [s.strip() for s in sources_input.split(',') if s.strip()]
+                  use_fullscrape = fullscrape
+              else:
+                  if category not in CATEGORIES:
+                      print(f'Unsupported category: {category}', file=sys.stderr)
+                      sys.exit(1)
+                  selected = list(CATEGORIES[category])
+                  # Preserve existing behavior: manual category=all defaults to fullscrape.
+                  use_fullscrape = fullscrape or category == 'all'
+
+          invalid = sorted(set(selected) - set(ALL_SCRAPERS))
+          if invalid:
+              print(f"Unknown sources: {', '.join(invalid)}", file=sys.stderr)
+              sys.exit(1)
+
+          selected_set = set(selected)
+          matrix = []
+          for shard_name, shard_sources in SHARDS:
+              picked = [s for s in shard_sources if s in selected_set]
+              if picked:
+                  matrix.append(
+                      {
+                          'name': shard_name,
+                          'sources_csv': ' '.join(picked),
+                          'source_count': len(picked),
+                          'needs_playwright': any(s in STEALTH_SOURCES for s in picked),
+                      }
+                  )
+
+          print(f"Selected sources ({len(selected)}): {', '.join(selected)}")
+          print(f'Shards to run: {len(matrix)}')
+          print(f'Fullscrape mode: {use_fullscrape}')
+
+          output_file = os.environ['GITHUB_OUTPUT']
+          with open(output_file, 'a', encoding='utf-8') as fh:
+              fh.write('matrix<<MATRIX_JSON\n')
+              fh.write(json.dumps(matrix))
+              fh.write('\nMATRIX_JSON\n')
+              fh.write(f"use_fullscrape={'true' if use_fullscrape else 'false'}\n")
+              fh.write(f"selected_sources={','.join(selected)}\n")
+              fh.write(f'shard_count={len(matrix)}\n')
+          PY
+
+  scrape-shards:
+    needs: plan
+    if: needs.plan.outputs.shard_count != '0'
     runs-on: ubuntu-latest
     timeout-minutes: 360
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: ${{ fromJson(needs.plan.outputs.matrix) }}
 
     steps:
       - name: Checkout
@@ -50,29 +175,98 @@ jobs:
       - name: Install dependencies
         run: |
           pip install -e .
+
+      - name: Install Playwright (stealth shards only)
+        if: matrix.shard.needs_playwright
+        run: |
           pip install playwright
           python -m playwright install chromium
 
-      - name: Run scrapers
+      - name: Run shard
         env:
-          SOURCES: ${{ github.event.inputs.sources }}
-          CATEGORY: ${{ github.event.inputs.category || 'all' }}
-          FULLSCRAPE: ${{ github.event.inputs.fullscrape || 'false' }}
+          SOURCES: ${{ matrix.shard.sources_csv }}
+          USE_FULLSCRAPE: ${{ needs.plan.outputs.use_fullscrape }}
         run: |
-          if [ "$FULLSCRAPE" = "true" ]; then
-            python main.py scrape --fullscrape
-          elif [ -n "$SOURCES" ]; then
-            IFS=',' read -ra SRC_ARRAY <<< "$SOURCES"
-            python main.py scrape "${SRC_ARRAY[@]}"
-          elif [ "$CATEGORY" = "bd" ]; then
-            python main.py scrape --bd
-          elif [ "$CATEGORY" = "intl" ]; then
-            python main.py scrape --intl
-          elif [ "$CATEGORY" = "research" ]; then
-            python main.py scrape --research
-          else
-            python main.py scrape --fullscrape
+          set -euo pipefail
+          echo "Shard: ${{ matrix.shard.name }}"
+          echo "Sources: ${SOURCES}"
+          ARGS=()
+          if [ "${USE_FULLSCRAPE}" = "true" ]; then
+            ARGS+=(--fullscrape)
           fi
+          read -r -a SRC_ARRAY <<< "${SOURCES}"
+          ARGS+=("${SRC_ARRAY[@]}")
+          python main.py scrape "${ARGS[@]}"
+
+      - name: Stage shard output
+        env:
+          SOURCES: ${{ matrix.shard.sources_csv }}
+        run: |
+          set -euo pipefail
+          mkdir -p shard-data
+          read -r -a SRC_ARRAY <<< "${SOURCES}"
+          for src in "${SRC_ARRAY[@]}"; do
+            if [ -d "data/${src}" ]; then
+              cp -R "data/${src}" "shard-data/${src}"
+            fi
+          done
+
+      - name: Upload shard artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: shard-${{ matrix.shard.name }}
+          path: shard-data/
+          retention-days: 7
+
+  merge-and-commit:
+    needs: [plan, scrape-shards]
+    if: needs.plan.outputs.shard_count != '0'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download shard artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: shard-*
+          merge-multiple: true
+          path: shard-data/
+
+      - name: Merge shard outputs
+        run: |
+          set -euo pipefail
+          mkdir -p data
+          for src_dir in shard-data/*; do
+            [ -d "${src_dir}" ] || continue
+            src="$(basename "${src_dir}")"
+            rm -rf "data/${src}"
+            cp -R "${src_dir}" "data/${src}"
+          done
+
+      - name: Rebuild checksums
+        run: |
+          python - <<'PY'
+          import hashlib
+          import json
+          from pathlib import Path
+
+          data_dir = Path('data')
+          checksums = {}
+          for drugs_file in sorted(data_dir.glob('*/drugs.json')):
+              checksums[drugs_file.parent.name] = hashlib.sha256(
+                  drugs_file.read_bytes()
+              ).hexdigest()
+
+          checksums_file = data_dir / 'checksums.json'
+          checksums_file.write_text(
+              json.dumps(checksums, indent=2) + '\n',
+              encoding='utf-8',
+          )
+          print(f'Wrote {len(checksums)} checksums')
+          PY
 
       - name: Check for changes
         id: changes
@@ -84,65 +278,21 @@ jobs:
             echo "changed=true" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Commit and push if changed
+      - name: Commit and push
         if: steps.changes.outputs.changed == 'true'
         run: |
+          set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           TIMESTAMP=$(date -u +"%Y-%m-%d %H:%M UTC")
-          git commit -m "data: daily drug refresh ($TIMESTAMP)"
+          git commit -m "data: sharded scrape refresh ($TIMESTAMP)"
           git pull --rebase
           git push
 
-      - name: Upload data artifacts
+      - name: Upload merged data artifact
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: drug-data-${{ github.run_number }}
           path: data/
           retention-days: 30
-
-  scrape-heavy:
-    runs-on: ubuntu-latest
-    timeout-minutes: 360
-    if: github.event_name == 'schedule' && github.event.schedule == '0 2 * * 0'
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-          cache: 'pip'
-
-      - name: Install dependencies
-        run: |
-          pip install -e .
-          pip install playwright
-          python -m playwright install chromium
-
-      - name: Run heavy scrapers
-        run: |
-          python main.py scrape --fullscrape medex dims bdmedex arogga osudpotro drugs_com pubchem chembl
-
-      - name: Check for changes
-        id: changes
-        run: |
-          git add -f data/
-          if git diff --cached --quiet; then
-            echo "changed=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "changed=true" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Commit and push if changed
-        if: steps.changes.outputs.changed == 'true'
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          TIMESTAMP=$(date -u +"%Y-%m-%d %H:%M UTC")
-          git commit -m "data: weekly full scrape update ($TIMESTAMP)"
-          git pull --rebase
-          git push

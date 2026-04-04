@@ -127,8 +127,7 @@ Output is saved as JSON in `data/<source>/drugs.json`.
 ## GitHub Actions
 
 The included workflow (`.github/workflows/scrape.yml`) runs:
-- **Daily** at 2 AM UTC: full scrape of all sources
-- **Weekly** (Sundays): heavy scrapers with 25k+ drugs
+- **Daily** at 2 AM UTC: full scrape of all sources in parallel shards (GitHub-hosted 6h-safe)
 - Auto-commits only when data changes (SHA256 checksums)
 - Manual trigger with source/category selection and `fullscrape` toggle
 
