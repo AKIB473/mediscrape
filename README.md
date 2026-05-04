@@ -17,7 +17,16 @@
 
 ## 🌟 Overview
 
-**Mediscrape** is a backend-grade, production-ready data pipeline that **unifies drug information from 29 diverse sources** into one clean, deduplicated, structured database. Built for researchers, pharmacists, developers, and healthcare innovators who need reliable drug data at scale.
+<div align="center">
+
+<img src="https://readme-typing-svg.demolab.com?font=Inter&weight=600&size=35&duration=3000&pause=1000&color=FF6B6B&center=true&vCenter=true&width=600&height=80&lines=UNIFIED+DRUG+INTELLIGENCE+PLATFORM%3B29+Sources+%7C+1+Database%3BBuilt+by+Akibuzzaman+Akib"
+  alt="Typing SVG" />
+
+</div>
+
+**Mediscrape** is a backend-grade, production-ready data pipeline that **unifies drug information from 29 diverse sources** into one clean, deduplicated, structured database. Built for researchers, pharmacists, developers, and healthcare innovators.
+
+*Created & maintained with ❤️ by **Akibuzzaman Akib** (@akibuzzaman7)*
 
 ### ✨ What It Does
 
@@ -28,52 +37,38 @@
 - **Exports** to SQLite database + JSON REST API format
 - **Bypasses** Cloudflare/bot protection automatically (4-level progressive stack)
 
-### 🎯 Use Cases
-
-- Drug price comparison & market research
-- Pharmaceutical databases & formularies
-- Clinical decision support systems
-- Drug interaction checkers
-- Medical research & analytics
-- Healthcare app backends
-
 ---
 
-## 🚀 Quick Start
+## 🤝 Contributing
 
-### Prerequisites
+We ❤️ contributions! This project was built by **Akibuzzaman Akib**, and we welcome everyone to help make it better.
 
-```bash
-# Python 3.11+ required
-python --version
+👉 **[Read our full Contributing Guide](CONTRIBUTING.md)**
 
-# Install dependencies (already in pyproject.toml)
-pip install -e .
+### 🏆 Contributors
 
-# Install Playwright browsers (for JS-heavy sites)
-pip install playwright
-playwright install chromium --with-deps
-```
+| Contributor | Role | Contributions |
+|-------------|------|---------------|
+| **[@akibuzzaman7](https://github.com/akibuzzaman7)** | 🥇 Lead Developer | All 29 scrapers, bypass system, pipeline architecture, database design |
+| You? | 🥈 Contributor | *(Add your name via PR!)* |
 
-### Basic Usage
+*Everyone who contributes will be credited in [AUTHORS.md](AUTHORS.md)!*
 
-```bash
-# Run the full pipeline (scrape + process)
-python main.py run-all
+### 🚀 How to Contribute
 
-# Or step by step:
-python main.py scrape          # Run all scrapers
-python main.py post-process    # Merge, normalize, build DB
-python main.py search-db "napa" # Search the database
-python main.py db-stats        # Show database statistics
-```
+1. **Pick an issue** from [GitHub Issues](https://github.com/AKIB473/mediscrape/issues)
+2. **Read [CONTRIBUTING.md](CONTRIBUTING.md)** for detailed guidelines
+3. **Fork → Branch → Code → Test → PR**
+4. **Get credited** in the project!
 
-### Docker (Recommended)
+### 🎯 Good First Issues
 
-```bash
-docker build -t mediscrape .
-docker run -v ./data:/app/data mediscrape python main.py run-all
-```
+- Add a new scraper for a missing source
+- Improve field extraction for existing scrapers
+- Add data validation rules
+- Enhance search functionality
+- Create Docker deployment
+- Write unit tests
 
 ---
 
@@ -102,13 +97,15 @@ docker run -v ./data:/app/data mediscrape python main.py run-all
 | **Drugs.com** | Playwright | ✅ Live | CF bypass, reviews |
 | **WebMD/EMC/MIMS** | Mixed | ✅ Live | Monographs, PIL |
 
+*... and 14 more sources (see scrapers/ directory)*
+
 ---
 
 ## 🏗️ Architecture
 
 ```
 
-        29 SCRAPERS (Parallel)             
+        29 SCRAPERS (Parallel)              
   ┌───────────┐ ┌───────────┐ ┌─────────┐ 
   │           │ │           │ │         │ 
   │ BD Sources│ │  API      │ │  Scrape │ 
@@ -166,10 +163,9 @@ docker run -v ./data:/app/data mediscrape python main.py run-all
 
 ## 🔐 Anti-Bot & Cloudflare Bypass
 
-**Progressive 4-Level Stack** — Automatic, no manual intervention:
+**Progressive 4-Level Stack** — Automatic:
 
-```python
-# utils/bypass.py
+```
 1️⃣ curl_cffi    → TLS/HTTP2 impersonation (0.5-2s) ⚡ Fastest
    ↓ (if rate-limited / JS challenge)
 2️⃣ cloudscraper → Direct Cloudflare solver (2-5s) 🌐
@@ -179,9 +175,9 @@ docker run -v ./data:/app/data mediscrape python main.py run-all
 4️⃣ httpx        → Simple fallback (no CF) 🔄
 ```
 
-- **Per-domain sessions** — Maintains cookies/CF clearance
-- **Automatic retry** — Transparent to scraper code
-- **No API keys** — Fully self-contained
+- Per-domain sessions maintain cookies/CF clearance
+- Automatic retry — transparent to scraper code
+- No API keys required — fully self-contained
 
 ---
 
@@ -193,7 +189,7 @@ docker run -v ./data:/app/data mediscrape python main.py run-all
 -- Canonical drugs (one row per unique drug)
 CREATE TABLE drugs (
     id INTEGER PRIMARY KEY,
-    canonical_id TEXT UNIQUE,      -- SHA256(generic+form+strength)
+    canonical_id TEXT UNIQUE,       -- SHA256(generic+form+strength)
     generic_name TEXT,
     dosage_form TEXT,
     strength TEXT,
@@ -254,7 +250,7 @@ CREATE TABLE chemistry (
 -- Source provenance
 CREATE TABLE sources (
     drug_id INTEGER REFERENCES drugs(id),
-    source_name TEXT,      -- e.g., "openfda", "medex"
+    source_name TEXT,       -- e.g., "openfda", "medex"
     source_url TEXT,
     source_id TEXT,
     scraped_at TIMESTAMP,
@@ -275,7 +271,7 @@ python main.py run-all
 # Individual steps
 python main.py scrape          # Run all scrapers, save raw JSON
 python main.py post-process    # Merge, normalize, build SQLite
-python main.py search-db <query>  # Search database (SQL + FTS5)
+python main.py search-db "napa" # Search database (SQL + FTS5)
 python main.py db-stats        # Show statistics
 
 # Scraper management
@@ -326,150 +322,46 @@ Same drug from different sources → same canonical ID → merged into one row.
 
 ---
 
-## 🤝 Contribution Guide
+## 🎬 Usage Examples
 
-### 💡 How to Contribute
-
-We welcome all contributions! Here's how you can help:
-
-#### 1️⃣ Add a New Scraper
-
-**Step 1:** Create scraper file
-```python
-# scrapers/[category]/new_source.py
-from scrapers.base import BaseScrapingScraper
-from models.drug import Drug
-
-class NewSourceScraper(BaseScrapingScraper):
-    name = "newsource"
-    base_url = "https://example.com"
-    rate_limit = 1.0
-    
-    async def scrape_all(self) -> AsyncIterator[Drug]:
-        # Your scraping logic
-        # Yield Drug objects
-        ...
-```
-
-**Step 2:** Add to scraper groups
-```python
-# scrapers/__init__.py
-BANGLADESH_SCRAPERS = [
-    ...
-    "newsource",
-]
-```
-
-**Step 3:** Test it
-```bash
-python main.py test-source newsource
-```
-
-#### 2️⃣ Improve Bypass
-
-- Add new bypass techniques
-- Improve detection handling
-- Reduce latency
-
-#### 3️⃣ Fix Data Quality
-
-- Improve field extraction
-- Add missing normalization rules
-- Fix parsing for specific sources
-
-#### 4️⃣ Enhance Pipeline
-
-- Add new export formats (CSV, Parquet)
-- Improve search (add FTS5, synonyms)
-- Add data validation rules
-
-### 📋 Coding Standards
-
-```bash
-# Format code
-black .
-
-# Type check
-mypy .
-
-# Lint
-ruff check --fix .
-```
-
-### 🧪 Testing
-
-```bash
-# Test all scrapers (sample mode)
-python main.py test-all
-
-# Test specific scraper
-python main.py test-source medex
-```
-
-### 📝 Pull Request Process
-
-1. **Fork** the repository
-2. **Create** a feature branch (`git checkout -b feature/new-scraper`)
-3. **Commit** your changes (`git commit -m 'feat: add newsource scraper'`)
-4. **Push** to your branch (`git push origin feature/new-scraper`)
-5. **Open** a Pull Request
-
-**PR Requirements:**
-- ✅ Code follows existing style
-- ✅ Scrapers use bypass stack
-- ✅ No hardcoded secrets
-- ✅ Handles None/empty gracefully
-- ✅ Includes tests or samples
-
----
-
-## 🎬 Demo & Usage Examples
-
-### Example 1: Get All Paracetamol Products
-
-```python
-import json
-from utils.database import DrugDatabase
-
-db = DrugDatabase("data/mediscrape.db")
-results = db.search("paracetamol")
-
-for drug in results:
-    print(f"Brand: {drug['brand_name']}")
-    print(f"Generic: {drug['generic_name']}")
-    print(f"Price: {drug.get('price', 'N/A')}")
-    print(f"Source: {drug['sources']}")
-    print("---")
-```
-
-### Example 2: Compare Prices Across Sources
+### Example 1: Search Database
 
 ```python
 import sqlite3, pandas as pd
 
 conn = sqlite3.connect("data/mediscrape.db")
 df = pd.read_sql_query("""
-    SELECT d.generic_name, b.brand_name, p.amount, p.currency, s.source_name
+    SELECT d.generic_name, b.brand_name, p.amount, s.source_name
     FROM drugs d
     JOIN brand_names b ON d.id = b.drug_id
     JOIN prices p ON d.id = p.drug_id
     JOIN sources s ON d.id = s.drug_id
     WHERE d.generic_name LIKE '%paracetamol%'
     ORDER BY p.amount
+    LIMIT 10
 """, conn)
 print(df)
 ```
 
-### Example 3: Export to JSON API
+### Example 2: Export to JSON
 
 ```python
 from utils.pipeline import DrugPipeline
 
 pipeline = DrugPipeline()
 pipeline.run_full_pipeline()
-
 # Output: data/merged_drugs.json
-# Ready for REST API serving!
+```
+
+### Example 3: Get Drug by Canonical ID
+
+```python
+from utils.database import DrugDatabase
+
+db = DrugDatabase("data/mediscrape.db")
+results = db.search("napa")
+for r in results:
+    print(r)
 ```
 
 ---
@@ -490,15 +382,15 @@ pipeline.run_full_pipeline()
 
 ## 🔒 Security & Privacy
 
-- **No personal data** collected
-- **Respects robots.txt** (where applicable)
-- **Rate limiting** per domain
-- **No API keys required** (except optional DrugBank)
-- **GitHub token**: Use `secrets.GITHUB_TOKEN` (auto-provided)
+- No personal data collected
+- Respects robots.txt (where applicable)
+- Rate limiting per domain
+- No API keys required (except optional DrugBank)
+- GitHub token: Use `secrets.GITHUB_TOKEN` (auto-provided)
 
 ### Token Rotation 🔑
 
-**Important:** Rotate exposed tokens immediately:
+Rotate exposed tokens immediately:
 ```bash
 gh secret set GITHUB_TOKEN --body "ghp_your_new_token"
 ```
@@ -507,13 +399,13 @@ gh secret set GITHUB_TOKEN --body "ghp_your_new_token"
 
 ## 📜 License
 
-MIT License - free for research, commercial, and learning use.
+MIT License — free for research, commercial, and learning use.
 
 ---
 
 ## ❤️ Acknowledgments
 
-- **Contributors:** [@akibuzzaman7](https://github.com/akibuzzaman7)
+- **Lead Developer:** [@akibuzzaman7](https://github.com/akibuzzaman7)
 - **Inspired by:** OpenFDA, RxNav, DailyMed
 - **Special thanks:** Bangladesh pharmaceutical community
 
