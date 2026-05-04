@@ -26,10 +26,30 @@ class ClinCalcScraper(BaseScrapingScraper):
             return
 
         jsonld = self.extract_jsonld(page)
-        page_html = page.text if hasattr(page, "text") else ""
 
-        # Use BeautifulSoup for reliable table parsing (scrapling css() can miss
-        # complex nested tables on some sites)
+        # scrapling Fetcher may return empty .text on some pages;
+        # use page.get_text() or re-fetch via httpx as fallback
+        page_html = ""
+        if hasattr(page, "text") and page.text:
+            page_html = page.text
+        elif hasattr(page, "get_text"):
+            page_html = page.get_text()
+
+        if not page_html or "tableTopDrugs" not in page_html:
+            # Re-fetch via httpx which reliably returns full HTML
+            try:
+                import httpx as _httpx
+                async with _httpx.AsyncClient(
+                    headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"},
+                    follow_redirects=True, timeout=20,
+                ) as _c:
+                    _r = await _c.get(f"{self.base_url}/DrugStats/Top300Drugs.aspx")
+                    page_html = _r.text
+            except Exception as e:
+                logger.error(f"ClinCalc: httpx fallback failed: {e}")
+                return
+
+        # Use BeautifulSoup for reliable table parsing
         from bs4 import BeautifulSoup as _BS
         soup = _BS(page_html, "html.parser")
         # ClinCalc uses id='tableTopDrugs'

@@ -34,7 +34,8 @@ class PharmGKBScraper(BaseAPIScraper):
         try:
             data = await self.api_get(
                 f"{BASE}/chemical",
-                params={"types": "Drug,SmallMolecule", "view": "max"},
+                # 'Drug,SmallMolecule' returns 404 - use 'Drug' only
+                params={"types": "Drug", "view": "base"},
             )
         except Exception as e:
             logger.error(f"PharmGKB: API error: {e}")
