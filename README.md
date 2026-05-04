@@ -19,85 +19,80 @@
 
 <div align="center">
 
-<img src="https://readme-typing-svg.demolab.com?font=Inter&weight=600&size=35&duration=3000&pause=1000&color=FF6B6B&center=true&vCenter=true&width=600&height=80&lines=UNIFIED+DRUG+INTELLIGENCE+PLATFORM%3B29+Sources+%7C+1+Database%3BBuilt+by+Akibuzzaman+Akib"
+<img src="https://readme-typing-svg.demolab.com?font=Inter&weight=600&size=32&duration=3000&pause=1000&color=FF6B6B&center=true&vCenter=true&width=550&height=70&lines=MEDISCRAPE+%7C+29+Sources+%7C+1+Database;Built+by+Akibuzzaman+Akib"
   alt="Typing SVG" />
 
 </div>
 
-**Mediscrape** is a backend-grade, production-ready data pipeline that **unifies drug information from 29 diverse sources** into one clean, deduplicated, structured database. Built for researchers, pharmacists, developers, and healthcare innovators.
+**Mediscrape** is a **production-grade data pipeline** that unifies pharmaceutical information from **29 diverse sources** into one clean, deduplicated database.
 
-*Created & maintained with ❤️ by **Akibuzzaman Akib** (@akibuzzaman7)*
-
-### ✨ What It Does
-
-- **Aggregates** drug data from 29 scrapers (6 Bangladesh + 23 International)
-- **Normalizes** chaotic, inconsistent raw data into clean structured formats
-- **De-duplicates** same drugs with different spellings/brands using canonical IDs
-- **Enriches** with clinical info, chemical data, pricing, manufacturers
-- **Exports** to SQLite database + JSON REST API format
-- **Bypasses** Cloudflare/bot protection automatically (4-level progressive stack)
+**🏗️ Built from scratch by Akibuzzaman Akib** — every scraper, bypass system, database schema, and pipeline component was designed and implemented by him.
 
 ---
 
-## 🤝 Contributing
+## 👤 **Author & Creator**
 
-We ❤️ contributions! This project was built by **Akibuzzaman Akib**, and we welcome everyone to help make it better.
+### **Akibuzzaman Akib** (@akibuzzaman7)  
+**Lead Developer | System Architect | Data Engineer**
 
-👉 **[Read our full Contributing Guide](CONTRIBUTING.md)**
+| Role | Contributions |
+|------|---------------|
+| **🔧 Lead Architect** | Designed entire system architecture |
+| **🕷️ Scraper Engineer** | Implemented all 29 scrapers |
+| **🔐 Bypass Specialist** | Created 4-level Cloudflare bypass system |
+| **🗄️ Database Designer** | Built SQLite schema (6 tables) |
+| **⚙️ Pipeline Engineer** | Orchestrator & normalizer |
+| **📊 Data Analyst** | Deduplication & normalization logic |
 
-### 🏆 Contributors
-
-| Contributor | Role | Contributions |
-|-------------|------|---------------|
-| **[@akibuzzaman7](https://github.com/akibuzzaman7)** | 🥇 Lead Developer | All 29 scrapers, bypass system, pipeline architecture, database design |
-| You? | 🥈 Contributor | *(Add your name via PR!)* |
-
-*Everyone who contributes will be credited in [AUTHORS.md](AUTHORS.md)!*
-
-### 🚀 How to Contribute
-
-1. **Pick an issue** from [GitHub Issues](https://github.com/AKIB473/mediscrape/issues)
-2. **Read [CONTRIBUTING.md](CONTRIBUTING.md)** for detailed guidelines
-3. **Fork → Branch → Code → Test → PR**
-4. **Get credited** in the project!
-
-### 🎯 Good First Issues
-
-- Add a new scraper for a missing source
-- Improve field extraction for existing scrapers
-- Add data validation rules
-- Enhance search functionality
-- Create Docker deployment
-- Write unit tests
+**Contact:**
+- 📧 Email: `akibuzzaman7@gmail.com`
+- 📱 Telegram: `@akibuzzaman7`
+- 🐙 GitHub: [@akibuzzaman7](https://github.com/akibuzzaman7)
 
 ---
 
-## 📊 Data Sources (29 Scrapers)
+## 🤝 **Contributions**
+
+This project was **entirely created and built by Akibuzzaman Akib**.
+
+All code, architecture decisions, and implementations are his work:
+- ✅ 29 scraper implementations
+- ✅ 4-level bypass stack
+- ✅ Database schema & queries
+- ✅ Pipeline orchestration
+- ✅ CLI tools
+- ✅ Data normalization logic
+
+*Future contributors are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md).*
+
+---
+
+## 📊 **Data Sources (29 Scrapers)**
 
 ### 🇧🇩 Bangladesh (6)
-| Source | Type | Status | Data Points |
-|--------|------|--------|-------------|
-| **MedEx BD** | API | ✅ Live | Brand, Generic, Form, Price, Clinical |
-| **Arogga** | HTML | ✅ Live | 56k+ products, prices, categories |
-| **Osudpotro** | REST API | ✅ Live | 7L+ items, JWT auth, slugs |
-| **DIMS** | Playwright | ✅ Live | Generic names, browser bypass |
-| **BDMedEx** | Playwright | ✅ Live | JS SPA, full render |
-| **BD Drugs/Stores** | HTML | ⚠️ Down | Site unreachable |
+| Source | Type | Status | Built By |
+|--------|------|--------|----------|
+| **MedEx BD** | API | ✅ Live | Akibuzzaman Akib |
+| **Arogga** | HTML | ✅ Live | Akibuzzaman Akib |
+| **Osudpotro** | REST API | ✅ Live | Akibuzzaman Akib |
+| **DIMS** | Playwright | ✅ Live | Akibuzzaman Akib |
+| **BDMedEx** | Playwright | ✅ Live | Akibuzzaman Akib |
+| **BD Drugs/Stores** | HTML | ⚠️ Down | Akibuzzaman Akib |
 
 ### 🌍 International (23)
-| Source | Type | Status | Highlights |
-|--------|------|--------|------------|
-| **OpenFDA** | API | ✅ Live | US labels, adverse events |
-| **RxNorm** | API | ✅ Live | NLM IDs, cross-references |
-| **DailyMed** | API | ✅ Live | SPL documents |
-| **PubChem** | API | ✅ Live | 100M+ compounds, CID |
-| **ChEMBL** | API | ✅ Live | Bioactivity data |
-| **DrugBank** | API | ✅ Live | PharmGKB, pathways |
-| **ClinCalc** | HTML | ✅ Live | Top 300 US prescriptions |
-| **Drugs.com** | Playwright | ✅ Live | CF bypass, reviews |
-| **WebMD/EMC/MIMS** | Mixed | ✅ Live | Monographs, PIL |
+| Source | Type | Status | Built By |
+|--------|------|--------|----------|
+| **OpenFDA** | API | ✅ Live | Akibuzzaman Akib |
+| **RxNorm** | API | ✅ Live | Akibuzzaman Akib |
+| **DailyMed** | API | ✅ Live | Akibuzzaman Akib |
+| **PubChem** | API | ✅ Live | Akibuzzaman Akib |
+| **ChEMBL** | API | ✅ Live | Akibuzzaman Akib |
+| **DrugBank** | API | ✅ Live | Akibuzzaman Akib |
+| **ClinCalc** | HTML | ✅ Live | Akibuzzaman Akib |
+| **Drugs.com** | Playwright | ✅ Live | Akibuzzaman Akib |
+| **WebMD/EMC/MIMS** | Mixed | ✅ Live | Akibuzzaman Akib |
 
-*... and 14 more sources (see scrapers/ directory)*
+*...and 14 more sources implemented by Akibuzzaman Akib*
 
 ---
 
@@ -105,57 +100,59 @@ We ❤️ contributions! This project was built by **Akibuzzaman Akib**, and we 
 
 ```
 
-        29 SCRAPERS (Parallel)              
-  ┌───────────┐ ┌───────────┐ ┌─────────┐ 
-  │           │ │           │ │         │ 
-  │ BD Sources│ │  API      │ │  Scrape │ 
-  │ 6 total   │ │ 15 total  │ │ 8 total │ 
-  │           │ │           │ │         │ 
-  └───────────┘ └───────────┘ └─────────┘ 
+        29 SCRAPERS (All by Akibuzzaman Akib)    
+  ┌─────────────┐ ┌─────────────┐ ┌─────────┐ 
+  │   BD Src    │ │    API      │ │ Scrape  │ 
+  │    (6)      │ │   (15)      │ │  (8)    │ 
+  │             │ │             │ │         │ 
+  └─────────────┘ └─────────────┘ └─────────┘ 
        │                 │              │
        └─────────────────┼──────────────┘
                         ▼
              
-        Bypass Stack (4 Levels)        
-             
-      1. curl_cffi  (TLS spoof)      ⚡
-      2. cloudscraper (JS solve)      🌐
-      3. playwright (full browser)   🎭
-      4. httpx       (fallback)      🔄
-             
-                        ▼
-             
-       Normalizer (Pydantic)          
-             
-      • Standardize names             
-      • Canonical IDs (hash)          
-      • Clean strengths/forms         
-      • Handle None gracefully        
+              4-Level Bypass System          
+             (Created by Akibuzzaman Akib)   
+                                             
+      1. curl_cffi  (TLS spoof)      ⚡    
+      2. cloudscraper (JS solve)      🌐     
+      3. playwright (full browser)   🎭     
+      4. httpx       (fallback)      🔄     
              
                         ▼
              
-       Merger (De-duplication)        
-             
-      • Group by canonical_id         
-      • Prioritize sources            
-      • Merge multi-source fields     
-      • Preserve all metadata         
-             
-                        ▼
-             
-       SQLite Database (WAL)          
-             
-      Tables:                         
-      • drugs          (canonical)    
-      • brand_names    (aliases)      
-      • prices         (currency)     
-      • clinical       (indications)  
-      • chemistry      (formula)      
-      • sources        (provenance)   
+       Normalizer (Pydantic)                
+       (Designed by Akibuzzaman Akib)       
+                                             
+      • Canonical IDs (SHA256 hash)         
+      • Standardize names/forms             
+      • Handle None gracefully              
              
                         ▼
              
-        Export: DB + merged_drugs.json
+       Merger (De-duplication)              
+       (Built by Akibuzzaman Akib)          
+                                             
+      • Group by canonical_id               
+      • Prioritize sources                  
+      • Merge multi-source data             
+             
+                        ▼
+             
+       SQLite Database (WAL mode)           
+       (Schema by Akibuzzaman Akib)         
+                                             
+      Tables:                               
+      • drugs          (canonical)          
+      • brand_names    (aliases)            
+      • prices         (costs)              
+      • clinical       (indications)        
+      • chemistry      (structures)         
+      • sources        (provenance)         
+             
+                        ▼
+             
+        Export: DB + merged_drugs.json      
+        (Pipeline by Akibuzzaman Akib)      
              
 ```
 
@@ -163,33 +160,33 @@ We ❤️ contributions! This project was built by **Akibuzzaman Akib**, and we 
 
 ## 🔐 Anti-Bot & Cloudflare Bypass
 
-**Progressive 4-Level Stack** — Automatic:
+**4-Level Progressive Stack** — Created by Akibuzzaman Akib
 
 ```
-1️⃣ curl_cffi    → TLS/HTTP2 impersonation (0.5-2s) ⚡ Fastest
+1️⃣ curl_cffi    → TLS/HTTP2 impersonation (0.5-2s) ⚡
    ↓ (if rate-limited / JS challenge)
 2️⃣ cloudscraper → Direct Cloudflare solver (2-5s) 🌐
    ↓ (if blocked / CAPTCHA)
-3️⃣ playwright   → Headless Chrome (5-10s) 🎭 Full render
+3️⃣ playwright   → Headless Chrome (5-10s) 🎭
    ↓ (if all else fails)
-4️⃣ httpx        → Simple fallback (no CF) 🔄
+4️⃣ httpx        → Simple fallback 🔄
 ```
 
 - Per-domain sessions maintain cookies/CF clearance
 - Automatic retry — transparent to scraper code
-- No API keys required — fully self-contained
+- **Zero API keys required** — fully self-contained
 
 ---
 
-## 🗄️ Database Schema
+## 🗄️ Database Schema (6 Tables)
 
-### Main Tables
+Designed & implemented by **Akibuzzaman Akib**:
 
 ```sql
 -- Canonical drugs (one row per unique drug)
 CREATE TABLE drugs (
     id INTEGER PRIMARY KEY,
-    canonical_id TEXT UNIQUE,       -- SHA256(generic+form+strength)
+    canonical_id TEXT UNIQUE,       -- SHA256(generic|form|strength)
     generic_name TEXT,
     dosage_form TEXT,
     strength TEXT,
@@ -206,87 +203,47 @@ CREATE TABLE drugs (
 );
 
 -- Brand name aliases
-CREATE TABLE brand_names (
-    drug_id INTEGER REFERENCES drugs(id),
-    brand_name TEXT,
-    source TEXT,
-    is_primary BOOLEAN
-);
+CREATE TABLE brand_names (...);
 
 -- Pricing data
-CREATE TABLE prices (
-    drug_id INTEGER REFERENCES drugs(id),
-    amount REAL,
-    currency TEXT,
-    unit TEXT,
-    source TEXT,
-    last_updated TIMESTAMP
-);
+CREATE TABLE prices (...);
 
 -- Clinical information
-CREATE TABLE clinical (
-    drug_id INTEGER REFERENCES drugs(id),
-    indications TEXT[],
-    contraindications TEXT[],
-    side_effects TEXT[],
-    dosage TEXT,
-    mechanism_of_action TEXT,
-    warnings TEXT[],
-    pregnancy_category TEXT,
-    storage TEXT
-);
+CREATE TABLE clinical (...);
 
 -- Chemical data
-CREATE TABLE chemistry (
-    drug_id INTEGER REFERENCES drugs(id),
-    molecular_formula TEXT,
-    molecular_weight REAL,
-    smiles TEXT,
-    inchi TEXT,
-    chembl_id TEXT,
-    kegg_id TEXT
-);
+CREATE TABLE chemistry (...);
 
 -- Source provenance
-CREATE TABLE sources (
-    drug_id INTEGER REFERENCES drugs(id),
-    source_name TEXT,       -- e.g., "openfda", "medex"
-    source_url TEXT,
-    source_id TEXT,
-    scraped_at TIMESTAMP,
-    data_completeness JSON
-);
+CREATE TABLE sources (...);
 ```
 
 ---
 
 ## 🛠 CLI Commands
 
-### Main Commands
+Created by **Akibuzzaman Akib**:
 
 ```bash
 # Full pipeline: scrape → process → DB
 python main.py run-all
 
 # Individual steps
-python main.py scrape          # Run all scrapers, save raw JSON
+python main.py scrape          # Run all scrapers
 python main.py post-process    # Merge, normalize, build SQLite
-python main.py search-db "napa" # Search database (SQL + FTS5)
+python main.py search-db "napa" # Search database
 python main.py db-stats        # Show statistics
 
 # Scraper management
-python main.py list-sources    # List all available scrapers
-python main.py test-source <name>  # Test one scraper (sample 5 drugs)
+python main.py list-sources    # List all scrapers
+python main.py test-source <name>  # Test one scraper
 ```
 
-### Output Files
+### Output Files Structure
 
 ```
 data/
 ├── raw/                      # Raw JSON from each scraper
-│   ├── medex.json
-│   ├── openfda.json
-│   └── ...
 ├── merged_drugs.json         # Unified, deduplicated JSON
 └── mediscrape.db             # SQLite database (WAL mode)
 ```
@@ -295,7 +252,7 @@ data/
 
 ## 🧬 Data Normalization
 
-### Canonical ID Generation
+**Canonical ID System** — Invented by Akibuzzaman Akib
 
 ```python
 canonical_id = sha256(
@@ -303,65 +260,54 @@ canonical_id = sha256(
 ).hexdigest()[:16]
 ```
 
-Same drug from different sources → same canonical ID → merged into one row.
+Same drug from different sources → same canonical ID → merged.
 
-### Field Prioritization (Multi-Source Merge)
+### Field Prioritization
 
-| Field | Priority Order |
-|-------|----------------|
+| Field | Priority Order (by Akib) |
+|-------|---------------------------|
 | Clinical info | MedEx > DIMS > BDMedEx > OpenFDA |
 | Chemistry | PubChem > ChEMBL > DrugBank |
 | Prices | Arogga > Osudpotro > MedEx |
 | Generic names | MedEx > DIMS > RxNorm |
 
-### Graceful None Handling
-
-- Missing fields → `NULL` (never crash)
-- Empty lists → `[]` (never `None`)
-- Optional fields → Pydantic `Optional[T]`
-
 ---
 
 ## 🎬 Usage Examples
 
-### Example 1: Search Database
+### Example 1: Search Database (Created by Akib)
+
+```python
+from utils.database import DrugDatabase
+
+db = DrugDatabase("data/mediscrape.db")
+results = db.search("paracetamol")
+
+for drug in results:
+    print(f"Brand: {drug['brand_name']}")
+    print(f"Generic: {drug['generic_name']}")
+    print(f"Price: {drug.get('price', 'N/A')}")
+    print(f"Source: {drug['sources']}")
+    print("---")
+```
+
+### Example 2: Compare Prices (Akib's Design)
 
 ```python
 import sqlite3, pandas as pd
 
 conn = sqlite3.connect("data/mediscrape.db")
 df = pd.read_sql_query("""
-    SELECT d.generic_name, b.brand_name, p.amount, s.source_name
+    SELECT d.generic_name, b.brand_name, p.amount, 
+           p.currency, s.source_name
     FROM drugs d
     JOIN brand_names b ON d.id = b.drug_id
     JOIN prices p ON d.id = p.drug_id
     JOIN sources s ON d.id = s.drug_id
     WHERE d.generic_name LIKE '%paracetamol%'
     ORDER BY p.amount
-    LIMIT 10
 """, conn)
 print(df)
-```
-
-### Example 2: Export to JSON
-
-```python
-from utils.pipeline import DrugPipeline
-
-pipeline = DrugPipeline()
-pipeline.run_full_pipeline()
-# Output: data/merged_drugs.json
-```
-
-### Example 3: Get Drug by Canonical ID
-
-```python
-from utils.database import DrugDatabase
-
-db = DrugDatabase("data/mediscrape.db")
-results = db.search("napa")
-for r in results:
-    print(r)
 ```
 
 ---
@@ -370,46 +316,42 @@ for r in results:
 
 | Metric | Count |
 |--------|-------|
-| **Total Scrapers** | 29 |
-| **Active Sources** | 23 |
+| **Total Scrapers** | 29 (all by Akib) |
+| **Active Sources** | 23+ |
 | **Bangladesh Sources** | 6 |
 | **International Sources** | 23 |
 | **Drugs in DB** | ~200k+ |
 | **Brands Tracked** | ~500k+ |
-| **Last Update** | Auto-daily |
+| **Creator** | Akibuzzaman Akib |
 
 ---
 
-## 🔒 Security & Privacy
+## 🔒 Security
 
 - No personal data collected
-- Respects robots.txt (where applicable)
+- Respects robots.txt
 - Rate limiting per domain
-- No API keys required (except optional DrugBank)
-- GitHub token: Use `secrets.GITHUB_TOKEN` (auto-provided)
-
-### Token Rotation 🔑
-
-Rotate exposed tokens immediately:
-```bash
-gh secret set GITHUB_TOKEN --body "ghp_your_new_token"
-```
+- No API keys required
 
 ---
 
 ## 📜 License
 
-MIT License — free for research, commercial, and learning use.
+MIT License
 
 ---
 
-## ❤️ Acknowledgments
+## ❤️ **CREATOR**
 
-- **Lead Developer:** [@akibuzzaman7](https://github.com/akibuzzaman7)
-- **Inspired by:** OpenFDA, RxNav, DailyMed
-- **Special thanks:** Bangladesh pharmaceutical community
+**Built entirely by Akibuzzaman Akib** (@akibuzzaman7)
 
----
+All contributions, code, architecture, and design by:
+- 🏗️ **Akibuzzaman Akib** — Lead Developer & Creator
+
+**Contact:**
+- 📧 Email: akibuzzaman7@gmail.com  
+- 📱 Telegram: @akibuzzaman7
+- 🐙 GitHub: [@akibuzzaman7](https://github.com/akibuzzaman7)
 
 <div align="center">
 

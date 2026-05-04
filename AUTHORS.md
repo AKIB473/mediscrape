@@ -1,58 +1,43 @@
 # Authors & Contributors
 
-## 🌟 Lead Developer
+## 🌟 Lead Developer & Creator
 
 **Akibuzzaman Akib** (@akibuzzaman7)
 - 🏗️ Initial project architecture
-- 🕷️ All 29 scraper implementations
-- 🔐 Cloudflare/CAPTCHA bypass system (4-level progressive stack)
-- 🗄️ Database pipeline & normalization
-- 📊 Data deduplication & canonical ID system
-- 🛠️ CLI commands & API design
+- 🕷️ All 29 scraper implementations (MedEx, Arogga, Osudpotro, DIMS, BDMedEx, OpenFDA, RxNorm, PubChem, DrugBank, and 20+ more)
+- 🔐 Cloudflare/CAPTCHA bypass system (4-level progressive stack: curl_cffi → cloudscraper → playwright → httpx)
+- 🗄️ Database pipeline & normalization (6 tables: drugs, brand_names, prices, clinical, chemistry, sources)
+- 📊 Data deduplication & canonical ID system (SHA256 hash-based)
+- 🛠️ CLI commands & API design (run-all, scrape, post-process, search-db, db-stats)
+- 🎨 Complete documentation (README, CONTRIBUTING, Architecture)
 
 ## 🤝 Contributors
 
-We welcome all contributors! Please add yourself here when you contribute.
+This project was **entirely created and built by Akibuzzaman Akib**.
 
-### How to Add Your Name
+All code, architecture decisions, implementations, and documentation are his work.
 
-1. Fork the repository
-2. Make your contribution
-3. Open a Pull Request
-4. Add your name below (with PR link)
+---
 
-```markdown
-## Contributors
+## 📝 Contributor Hall of Fame
 
 | Name | GitHub | Contributions |
 |------|--------|---------------|
-| Your Name | @yourusername | What you contributed |
-```
+| Akibuzzaman Akib | @akibuzzaman7 | Lead Developer - All 29 scrapers, bypass system, database, pipeline, CLI |
 
-### Contributor Hall of Fame
-
-*Coming soon... Be the first!*
-
-We appreciate all contributions, big or small:
-- 🐛 Bug fixes
-- ✨ New features
-- 📚 Documentation improvements
-- 🌍 Translation help
-- 💡 Ideas & suggestions
+---
 
 ## 🙏 Acknowledgments
 
 Special thanks to:
-- **OpenFDA** team for free drug data APIs
-- **RxNorm** (NLM) for standard identifiers
-- **PubChem/ChEMBL** for chemical data
-- **DailyMed** for structured labeling
-- Bangladesh pharmaceutical community for local data sources
-- All open-source maintainers whose tools we use
+- Bangladesh pharmaceutical community
+- OpenFDA, RxNorm, DailyMed teams
+- PubChem, ChEMBL, DrugBank maintainers
+- All open-source library maintainers
 
 ## 📜 License
 
-All contributions are licensed under the MIT License (see LICENSE file).
+All contributions are under MIT License (see LICENSE file).
 
 ---
 
