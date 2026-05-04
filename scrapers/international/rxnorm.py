@@ -19,11 +19,24 @@ class RxNormScraper(BaseAPIScraper):
     rate_limit = 0.25  # NLM is generous but be polite
 
     async def scrape_all(self) -> AsyncIterator[Drug]:
-        # Get all drug concepts
-        # NB: tty values must be space-separated (httpx URL-encodes + as %2B)
-        data = await self.api_get(f"{BASE}/allconcepts.json?tty=SBD+SCD+GPCK+BPCK+IN+BN")
-        concepts = data.get("minConceptGroup", {}).get("minConcept", [])
-        logger.info(f"RxNorm: found {len(concepts)} concepts")
+        # Get all drug concepts.
+        # RxNav /allconcepts.json requires tty as a space-separated query param.
+        # httpx params= encodes spaces as %20 which the API accepts; avoid + encoding.
+        # Fetch each tty type separately to stay within response size limits.
+        all_concepts: list[dict] = []
+        for tty in ["BN", "IN", "SBD", "SCD"]:
+            try:
+                data = await self.api_get(
+                    f"{BASE}/allconcepts.json",
+                    params={"tty": tty},
+                )
+                batch = data.get("minConceptGroup", {}).get("minConcept", [])
+                logger.info(f"RxNorm: {tty} → {len(batch)} concepts")
+                all_concepts.extend(batch)
+            except Exception as e:
+                logger.warning(f"RxNorm: failed to get tty={tty}: {e}")
+        concepts = all_concepts
+        logger.info(f"RxNorm: {len(concepts)} total concepts")
 
         for concept in concepts:
             rxcui = concept.get("rxcui")

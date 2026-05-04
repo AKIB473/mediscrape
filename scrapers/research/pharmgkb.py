@@ -25,50 +25,28 @@ class PharmGKBScraper(BaseAPIScraper):
     rate_limit = 0.5
 
     async def scrape_all(self) -> AsyncIterator[Drug]:
-        # PharmGKB API: paginate through all drug chemicals
-        # Default page size is 200; iterate until no more results
-        page = 1
-        page_size = 200
-        total_yielded = 0
+        """
+        PharmGKB API: /v1/data/chemical returns all Drug/SmallMolecule chemicals
+        in a single response when no pagination params are given.
+        Pagination params 'page', 'pg', 'limit' are NOT supported — the API
+        returns all matching records at once (typically ~700-1000 Drug entries).
+        """
+        try:
+            data = await self.api_get(
+                f"{BASE}/chemical",
+                params={"types": "Drug,SmallMolecule", "view": "max"},
+            )
+        except Exception as e:
+            logger.error(f"PharmGKB: API error: {e}")
+            return
 
-        while True:
-            try:
-                data = await self.api_get(
-                    f"{BASE}/chemical",
-                    params={
-                        "types": "Drug,SmallMolecule",
-                        "view": "max",
-                        "pg": page,
-                        "pageSize": page_size,
-                    },
-                )
-            except Exception as e:
-                logger.error(f"PharmGKB: API error on page {page}: {e}")
-                break
+        items = data.get("data", [])
+        logger.info(f"PharmGKB: {len(items)} chemicals")
 
-            items = data.get("data", [])
-            if not items:
-                break
-
-            logger.info(f"PharmGKB: page {page} → {len(items)} chemicals")
-
-            for item in items:
-                drug = self._parse_chemical(item)
-                if drug:
-                    yield drug
-                    total_yielded += 1
-
-            # Check if there are more pages
-            meta = data.get("meta", {})
-            total_count = meta.get("count", 0)
-            if total_count and total_yielded >= total_count:
-                break
-            if len(items) < page_size:
-                break  # Last page
-
-            page += 1
-
-        logger.info(f"PharmGKB: scraped {total_yielded} total chemicals")
+        for item in items:
+            drug = self._parse_chemical(item)
+            if drug:
+                yield drug
 
     def _parse_chemical(self, item: dict) -> Drug | None:
         name = item.get("name")

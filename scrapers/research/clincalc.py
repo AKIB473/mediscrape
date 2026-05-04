@@ -26,34 +26,47 @@ class ClinCalcScraper(BaseScrapingScraper):
             return
 
         jsonld = self.extract_jsonld(page)
+        page_html = page.text if hasattr(page, "text") else ""
 
-        # Parse the main table
-        table = page.css_first("table")
-        if not table:
-            logger.error("ClinCalc: no table found")
+        # Use BeautifulSoup for reliable table parsing (scrapling css() can miss
+        # complex nested tables on some sites)
+        from bs4 import BeautifulSoup as _BS
+        soup = _BS(page_html, "html.parser")
+        # ClinCalc uses id='tableTopDrugs'
+        table_el = (
+            soup.find("table", id="tableTopDrugs")
+            or soup.find("table", id=re.compile(r"drug|top|stat", re.I))
+            or soup.find("table")
+        )
+        if not table_el:
+            logger.error("ClinCalc: no table found on page")
             return
 
-        rows = table.css("tr")
-        headers = [_text(th).lower() for th in rows[0].css("th")] if rows else []
+        # Build header map
+        header_row = table_el.find("tr")
+        headers = [th.get_text(strip=True).lower() for th in (header_row.find_all(["th", "td"]) if header_row else [])]
+        logger.info(f"ClinCalc: headers = {headers}")
 
-        for row in rows[1:]:
-            cells = row.css("td")
-            if len(cells) < 3:
+        data_rows = table_el.find_all("tr")[1:] if header_row else table_el.find_all("tr")
+
+        for row in data_rows:
+            soup_cells = row.find_all("td")
+            if len(soup_cells) < 3:
                 continue
 
             data = {}
-            for i, cell in enumerate(cells):
+            for i, cell in enumerate(soup_cells):
                 key = headers[i] if i < len(headers) else f"col_{i}"
-                data[key] = _text(cell)
+                data[key] = cell.get_text(strip=True)
 
             # Get link to detail page
-            detail_link = row.css_first("a")
+            link_tag = row.find("a")
             detail_url = ""
-            if detail_link:
-                href = detail_link.attrib.get("href", "")
+            if link_tag and link_tag.get("href"):
+                href = link_tag["href"]
                 detail_url = href if href.startswith("http") else f"{self.base_url}/DrugStats/{href}"
 
-            drug_name = data.get("drug name", data.get("drug", _text(cells[0])))
+            drug_name = data.get("drug name", data.get("drug", soup_cells[0].get_text(strip=True) if soup_cells else ""))
             if not drug_name:
                 continue
 

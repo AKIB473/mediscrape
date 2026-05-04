@@ -26,6 +26,11 @@ class OsudpotroScraper(BaseScrapingScraper):
     base_url = "https://osudpotro.com"
     rate_limit = 1.0
     use_stealth = True
+    # NOTE: Category pages return HTTP 500 and /medicines has empty pageProps.
+    # URL discovery requires Playwright (DynamicFetcher) to render JS.
+    # Individual product pages (e.g. /napa) do have __NEXT_DATA__ server-side.
+    # URL collection falls back to stealth-rendered category pages.
+    use_dynamic = True  # Enable full browser rendering for URL discovery
 
     async def scrape_all(self) -> AsyncIterator[Drug]:
         # Discover product URLs from category pages
@@ -41,72 +46,163 @@ class OsudpotroScraper(BaseScrapingScraper):
                 logger.warning(f"Osudpotro: error scraping {url}: {e}")
 
     async def _get_product_urls(self) -> list[str]:
-        urls = set()
+        """
+        Osudpotro URL discovery strategy (verified 2026-05):
+        1. Homepage __NEXT_DATA__ has Redux initialState but no category list
+        2. Individual product pages e.g. /napa have __NEXT_DATA__.props.pageProps.productData
+        3. Category pages: /category/{alias}?page={n} paginate with __NEXT_DATA__
+        4. Sitemap is JS-rendered (useless for URL extraction)
 
-        # Try to get category list first
+        Best strategy: scrape category listing pages via httpx (lighter than stealth)
+        to collect product slugs, then scrape individual pages with stealth.
+        """
+        import httpx as _httpx
+        import orjson as _orjson
+
+        urls: dict[str, None] = {}
+
+        # Step 1: Get category list via plain httpx (the category listing page
+        # renders category names server-side in the initial HTML even without JS)
+        category_aliases: list[str] = []
         try:
-            page = await self.fetch_page(self.base_url)
-            # Extract __NEXT_DATA__ from homepage for category list
-            next_data = self._extract_next_data(page)
-            if next_data:
-                # Look for categories in pageProps
-                props = next_data.get("props", {}).get("pageProps", {})
-                categories = props.get("categories", props.get("allCategories", []))
-                if isinstance(categories, list):
-                    for cat in categories:
-                        alias = cat.get("alias") or cat.get("slug") or cat.get("_id", "")
+            async with _httpx.AsyncClient(
+                headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"},
+                follow_redirects=True, timeout=15,
+            ) as _c:
+                r = await _c.get(self.base_url)
+                # Try extracting __NEXT_DATA__ from homepage
+                import re as _re
+                nd_match = _re.search(
+                    r'<script id="__NEXT_DATA__"[^>]*>(\{[\s\S]+?\})</script>', r.text
+                )
+                if nd_match:
+                    nd = _orjson.loads(nd_match.group(1))
+                    props = nd.get("props", {}).get("pageProps", {})
+                    cats = props.get("categories") or nd.get("props", {}).get("initialState", {}).get("home", {}).get("categories", [])
+                    for cat in (cats or []):
+                        alias = cat.get("alias") or cat.get("slug")
                         if alias:
-                            # Paginate through category
-                            for pg in range(1, 200):
-                                try:
-                                    cat_page = await self.fetch_page(
-                                        f"{self.base_url}/category/{alias}?page={pg}"
-                                    )
-                                    cat_data = self._extract_next_data(cat_page)
-                                    if cat_data:
-                                        cat_props = cat_data.get("props", {}).get("pageProps", {})
-                                        products = cat_props.get("products", cat_props.get("items", []))
-                                        if not products:
-                                            break
-                                        for p in products:
-                                            slug = p.get("alias") or p.get("slug") or p.get("_id", "")
-                                            if slug:
-                                                urls.add(f"{self.base_url}/{slug}")
-                                    else:
-                                        # Fallback: look for product links in HTML
-                                        found = 0
-                                        for link in cat_page.css('a[href]'):
-                                            href = link.attrib.get("href", "")
-                                            if href and href.startswith("/") and not href.startswith("/category"):
-                                                full = f"{self.base_url}{href}"
-                                                urls.add(full)
-                                                found += 1
-                                        if found == 0:
-                                            break
-                                except Exception:
-                                    break
+                            category_aliases.append(alias)
+
+                # If no categories from homepage, scrape /category page for links
+                if not category_aliases:
+                    r2 = await _c.get(f"{self.base_url}/category")
+                    cat_links = _re.findall(r'/category/([a-z0-9-]+)', r2.text)
+                    category_aliases = list(dict.fromkeys(cat_links))  # dedup, preserve order
+
         except Exception as e:
-            logger.warning(f"Osudpotro: category discovery failed: {e}")
+            logger.warning(f"Osudpotro: category list fetch failed: {e}")
 
-        # Fallback: paginated product listing
+        logger.info(f"Osudpotro: found {len(category_aliases)} categories")
+
+        # Step 2: Paginate each category via plain httpx to collect product slugs
+        try:
+            async with _httpx.AsyncClient(
+                headers={"User-Agent": "Mozilla/5.0"},
+                follow_redirects=True, timeout=15,
+            ) as _c:
+                import re as _re
+                for alias in category_aliases:
+                    for pg in range(1, 300):
+                        try:
+                            r = await _c.get(
+                                f"{self.base_url}/category/{alias}",
+                                params={"page": pg},
+                            )
+                            nd_match = _re.search(
+                                r'<script id="__NEXT_DATA__"[^>]*>(\{[\s\S]+?\})</script>',
+                                r.text,
+                            )
+                            if not nd_match:
+                                break
+                            nd = _orjson.loads(nd_match.group(1))
+                            cat_props = nd.get("props", {}).get("pageProps", {})
+                            products = (
+                                cat_props.get("products")
+                                or cat_props.get("items")
+                                or cat_props.get("data", [])
+                            )
+                            if not products:
+                                break
+                            for p in products:
+                                slug = p.get("alias") or p.get("slug") or p.get("_id")
+                                if slug:
+                                    urls[f"{self.base_url}/{slug}"] = None
+                        except Exception:
+                            break
+        except Exception as e:
+            logger.warning(f"Osudpotro: category pagination failed: {e}")
+
+        # Step 3: Fallback — stealth/dynamic rendered category pages
         if not urls:
-            for pg in range(1, 500):
-                try:
-                    page = await self.fetch_page(f"{self.base_url}/medicines?page={pg}")
-                    found = 0
-                    for link in page.css('a[href]'):
-                        href = link.attrib.get("href", "")
-                        if href and href.startswith("/") and len(href) > 2 and not href.startswith(("/category", "/medicines", "/cart", "/account")):
-                            urls.add(f"{self.base_url}{href}")
-                            found += 1
-                    if found == 0:
+            # homeScreenData has category aliases; use dynamic fetcher to
+            # render category pages that require JS (they return 500 to httpx)
+            import re as _re
+            for alias in ['prescription-medicines', 'otc-medicines', 'treatments-medicine']:
+                for pg in range(1, 200):
+                    try:
+                        cat_page = await self.fetch_page(
+                            f"{self.base_url}/category/{alias}?page={pg}"
+                        )
+                        cat_text = cat_page.text if hasattr(cat_page, 'text') else ''
+                        nd_match = _re.search(
+                            r'<script id="__NEXT_DATA__"[^>]*>(\{[\s\S]+?\})</script>',
+                            cat_text,
+                        )
+                        products = []
+                        if nd_match:
+                            nd = _orjson.loads(nd_match.group(1))
+                            cat_props = nd.get("props", {}).get("pageProps", {})
+                            products = (
+                                cat_props.get("products")
+                                or cat_props.get("items")
+                                or cat_props.get("data", [])
+                            ) or []
+                        if not products:
+                            # Also try extracting slug from rendered page links
+                            for link in cat_page.css('a[href]'):
+                                href = link.attrib.get('href', '')
+                                if href and href.startswith('/') and len(href) > 2 \
+                                        and not href.startswith(('/category', '/cart', '/account', '/login')):
+                                    urls[f"{self.base_url}{href}"] = None
+                            break
+                        for p in products:
+                            slug = p.get("alias") or p.get("slug") or p.get("_id")
+                            if slug:
+                                urls[f"{self.base_url}/{slug}"] = None
+                    except Exception:
                         break
-                except Exception:
-                    break
 
-        return list(urls)
+        logger.info(f"Osudpotro: collected {len(urls)} unique product URLs")
+        return list(urls.keys())
 
     async def _scrape_product_page(self, url: str) -> Drug | None:
+        # Try fast httpx first (Osudpotro renders __NEXT_DATA__ server-side)
+        import httpx as _httpx, re as _re, orjson as _orjson
+        try:
+            async with _httpx.AsyncClient(
+                headers={"User-Agent": "Mozilla/5.0"},
+                follow_redirects=True, timeout=15,
+            ) as _c:
+                r = await _c.get(url)
+                nd_match = _re.search(
+                    r'<script id="__NEXT_DATA__"[^>]*>(\{[\s\S]+?\})</script>', r.text
+                )
+                if nd_match:
+                    nd = _orjson.loads(nd_match.group(1))
+                    props = nd.get("props", {}).get("pageProps", {})
+                    product = (
+                        props.get("productData")
+                        or props.get("product")
+                        or props.get("item")
+                        or props.get("data", {})
+                    )
+                    if isinstance(product, dict) and product:
+                        return self._parse_product(product, url)
+        except Exception:
+            pass
+
+        # Fallback: stealth scraper
         page = await self.fetch_page(url)
 
         # Primary method: extract __NEXT_DATA__
