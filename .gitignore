@@ -7,7 +7,13 @@ dist/
 build/
 .venv/
 venv/
-data/
+# Large/auto-generated files
+data/raw/*.json
 *.json
 !pyproject.toml
+
+# But keep processed outputs in git (optional, usually not)
+# Remove the line below if you want to keep merged_drugs.json in repo
+# !data/merged_drugs.json
+
 .env
