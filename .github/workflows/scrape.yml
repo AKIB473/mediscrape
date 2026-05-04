@@ -175,6 +175,7 @@ jobs:
       - name: Install dependencies
         run: |
           pip install -e .
+          pip install curl_cffi cloudscraper
 
       - name: Install Playwright (stealth shards only)
         if: matrix.shard.needs_playwright

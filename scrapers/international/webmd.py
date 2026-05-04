@@ -17,6 +17,7 @@ class WebMDScraper(BaseScrapingScraper):
     base_url = "https://www.webmd.com"
     rate_limit = 2.0
     use_stealth = True
+    use_dynamic = True  # Playwright needed for heavy CF protection
 
     async def scrape_all(self) -> AsyncIterator[Drug]:
         urls = await self._get_all_drug_urls()
