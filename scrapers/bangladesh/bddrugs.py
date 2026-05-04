@@ -16,9 +16,21 @@ class BDDrugsScraper(BaseScrapingScraper):
     name = "bddrugs"
     base_url = "https://www.bddrugs.com"
     rate_limit = 1.5
+    # NOTE: bddrugs.com returns HTTP 522 (Connection Timed Out) / is currently offline.
+    # Scraper will gracefully yield nothing when the site is unreachable.
 
     async def scrape_all(self) -> AsyncIterator[Drug]:
         urls = set()
+
+        # First check if site is reachable at all
+        try:
+            page = await self.fetch_page(f"{self.base_url}/")
+            if page.status not in (200, 301, 302):
+                logger.warning(f"BDDrugs: site returned {page.status}, skipping")
+                return
+        except Exception as e:
+            logger.warning(f"BDDrugs: site unreachable ({e}), skipping")
+            return
 
         # Try multiple index patterns
         index_paths = [

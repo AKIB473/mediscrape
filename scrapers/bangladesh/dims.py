@@ -34,43 +34,42 @@ class DIMSScraper(BaseScrapingScraper):
                 logger.warning(f"DIMS: error scraping {url}: {e}")
 
     async def _get_all_generics(self) -> list[str]:
-        urls = set()
-        # Try alphabetical index
-        for letter in "abcdefghijklmnopqrstuvwxyz":
+        """
+        DIMS generics/brands index pages list drug names as plain text (not links) —
+        actual drug content is app-only (requires DIMS Premium mobile app).
+        We convert the visible generic names to slug-based URLs and try fetching
+        individual pages for whatever the web server exposes.
+        """
+        import re as _re
+
+        generic_names: list[str] = []
+        letters = ["numeric"] + list("abcdefghijklmnopqrstuvwxyz")
+
+        for letter in letters:
             try:
-                page = await self.fetch_page(f"{self.base_url}/generic?letter={letter}")
-                for link in page.css('a[href*="/generic/"]'):
+                page = await self.fetch_page(f"{self.base_url}/generics/{letter}")
+                # Links to individual generic pages may or may not exist;
+                # try both href-based and text-based extraction
+                for link in page.css('a[href*="/generics/"]'):
                     href = link.attrib.get("href", "")
-                    if href:
+                    suffix = href.rstrip("/").split("/")[-1]
+                    if href and suffix not in letters and len(suffix) > 2:
                         full = href if href.startswith("http") else f"{self.base_url}{href}"
-                        urls.add(full)
+                        generic_names.append(full)
+
+                # Fallback: extract plain-text names and build slugged URLs
+                for elem in page.css("li, .generic-item, p"):
+                    name = _text(elem).strip()
+                    if name and 3 < len(name) < 120 and _re.match(r"^[A-Za-z]", name):
+                        slug = name.lower().strip()
+                        slug = _re.sub(r"[^a-z0-9]+", "-", slug).strip("-")
+                        url = f"{self.base_url}/generics/{slug}"
+                        if url not in generic_names:
+                            generic_names.append(url)
             except Exception:
                 pass
 
-        # Also try the main generics page
-        try:
-            page = await self.fetch_page(f"{self.base_url}/generic")
-            for link in page.css('a[href*="/generic/"]'):
-                href = link.attrib.get("href", "")
-                if href:
-                    full = href if href.startswith("http") else f"{self.base_url}{href}"
-                    urls.add(full)
-        except Exception:
-            pass
-
-        # Try brand index too
-        for letter in "abcdefghijklmnopqrstuvwxyz":
-            try:
-                page = await self.fetch_page(f"{self.base_url}/brand?letter={letter}")
-                for link in page.css('a[href*="/brand/"]'):
-                    href = link.attrib.get("href", "")
-                    if href:
-                        full = href if href.startswith("http") else f"{self.base_url}{href}"
-                        urls.add(full)
-            except Exception:
-                pass
-
-        return list(urls)
+        return generic_names
 
     async def _scrape_generic_page(self, url: str) -> AsyncIterator[Drug]:
         page = await self.fetch_page(url)

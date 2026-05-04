@@ -84,6 +84,33 @@ class MedExScraper(BaseScrapingScraper):
         if not title:
             return None
 
+        # MedEx specific: generic name is in a dedicated element near the header
+        # e.g. <div class='generic-name'>Vitamin B1, B6 & B12</div>
+        # or appears in the header block as text after the brand name
+        generic_name = ""
+        # Try dedicated generic name element
+        for sel in [".generic-name", ".generic_name", "[class*='generic-name']",
+                    ".product-generic", ".medicine-generic"]:
+            elem = page.css_first(sel)
+            if elem:
+                generic_name = _text(elem)
+                break
+        # Fallback: look for a standalone link/span that points to a /generics/ URL
+        if not generic_name:
+            for link in page.css('a[href*="/generics/"]'):
+                t = _text(link)
+                if t and len(t) > 2:
+                    generic_name = t
+                    break
+        # Fallback: check JSON-LD for generic info
+        if not generic_name and jsonld:
+            for ld in jsonld:
+                if isinstance(ld, dict):
+                    g = ld.get("activeIngredient") or ld.get("nonProprietaryName")
+                    if g:
+                        generic_name = g if isinstance(g, str) else ""
+                        break
+
         # Extract key-value fields from the detail table
         fields = {}
         for row in page.css("tr"):
@@ -102,27 +129,60 @@ class MedExScraper(BaseScrapingScraper):
                 if key and val:
                     fields[key] = val
 
-        # Extract sections (indications, side effects, etc.)
+        # Extract sections (indications, side effects, etc.) using MedEx structure
+        # MedEx uses h3 headings with content in following div/p siblings
         sections = {}
-        for heading in page.css("h2, h3, h4, .section-title"):
-            key = _text(heading).lower().strip()
-            # Collect all following siblings until next heading
-            content_parts = []
-            parent = heading.parent
-            if parent:
-                for child in parent.css("p, ul li, ol li, div.content"):
-                    t = _text(child)
-                    if t and len(t) > 3:
-                        content_parts.append(t)
-            if content_parts:
-                sections[key] = "\n".join(content_parts)
+        # Try the generic-data-container which holds all clinical sections
+        data_container = page.css_first(".generic-data-container, .drug-details, .medicine-details")
+        container_to_search = data_container if data_container else page
+        current_key = ""
+        for elem in container_to_search.css("h2, h3, h4, p, div, ul li"):
+            tag = getattr(elem, 'tag', '') or ''
+            text = _text(elem)
+            if tag in ("h2", "h3", "h4"):
+                current_key = text.lower().strip()
+            elif current_key and text and len(text) > 5:
+                if current_key not in sections:
+                    sections[current_key] = text
+                else:
+                    sections[current_key] += "\n" + text
 
-        generic_name = fields.get("generic", fields.get("generic name", ""))
+        # Fallback section extraction for older structure
+        if not sections:
+            for heading in page.css("h2, h3, h4, .section-title"):
+                key = _text(heading).lower().strip()
+                content_parts = []
+                parent = heading.parent
+                if parent:
+                    for child in parent.css("p, ul li, ol li, div.content"):
+                        t = _text(child)
+                        if t and len(t) > 3:
+                            content_parts.append(t)
+                if content_parts:
+                    sections[key] = "\n".join(content_parts)
+
+        if not generic_name:
+            generic_name = fields.get("generic", fields.get("generic name", ""))
         manufacturer_name = fields.get("manufacturer", fields.get("company", fields.get("marketed by", "")))
+        # MedEx shows manufacturer as plain text in header block
+        if not manufacturer_name:
+            mfr_elem = page.css_first(".manufacturer, .company-name, [class*='pharma']")
+            if mfr_elem:
+                manufacturer_name = _text(mfr_elem)
         price_text = fields.get("unit price", fields.get("price", fields.get("mrp", "")))
+        # MedEx shows price in .package-container
+        if not price_text:
+            pkg = page.css_first(".package-container, .packages-wrapper")
+            if pkg:
+                price_text = _text(pkg)
         strength = fields.get("strength", fields.get("dose", ""))
         dosage_form = fields.get("dosage form", fields.get("type", ""))
         therapeutic_class = fields.get("therapeutic class", fields.get("class", ""))
+        # MedEx therapeutic class is in a dedicated section
+        if not therapeutic_class:
+            tc_text = sections.get("therapeutic class", "")
+            if tc_text:
+                therapeutic_class = tc_text.split("\n")[0].strip()
         pack_size = fields.get("pack size", "")
 
         return Drug(

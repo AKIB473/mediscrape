@@ -20,25 +20,30 @@ class BDMedExScraper(BaseScrapingScraper):
     async def scrape_all(self) -> AsyncIterator[Drug]:
         all_urls = set()
 
-        # Scrape generic index
-        for letter in "abcdefghijklmnopqrstuvwxyz0":
+        # Correct URL pattern: /generic/list-{letter}/ and /brand/list-{letter}/
+        list_keys = ["9"] + list("abcdefghijklmnopqrstuvwxyz")
+
+        # Scrape generic index (correct path: /generic/list-{letter}/)
+        for letter in list_keys:
             try:
-                page = await self.fetch_page(f"{self.base_url}/generics/{letter}")
-                for link in page.css('a[href*="/generic/"], a[href*="/generics/"]'):
+                page = await self.fetch_page(f"{self.base_url}/generic/list-{letter}/")
+                for link in page.css('a[href*="/generic/"]'):
                     href = link.attrib.get("href", "")
-                    if href and len(href) > 10:
+                    # Skip list index pages themselves
+                    if href and "/generic/list-" not in href and len(href) > 20:
                         full = href if href.startswith("http") else f"{self.base_url}{href}"
                         all_urls.add(full)
             except Exception:
                 pass
 
-        # Also scrape brand index
-        for letter in "abcdefghijklmnopqrstuvwxyz0":
+        # Also scrape brand index (correct path: /brand/list-{letter}/)
+        for letter in list_keys:
             try:
-                page = await self.fetch_page(f"{self.base_url}/brands/{letter}")
+                page = await self.fetch_page(f"{self.base_url}/brand/list-{letter}/")
                 for link in page.css('a[href*="/brand/"]'):
                     href = link.attrib.get("href", "")
-                    if href:
+                    # Skip list index pages themselves
+                    if href and "/brand/list-" not in href and len(href) > 20:
                         full = href if href.startswith("http") else f"{self.base_url}{href}"
                         all_urls.add(full)
             except Exception:

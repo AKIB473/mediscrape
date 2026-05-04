@@ -16,9 +16,21 @@ class BDDrugstoreScraper(BaseScrapingScraper):
     name = "bddrugstore"
     base_url = "https://www.bddrugstore.com"
     rate_limit = 1.5
+    # NOTE: bddrugstore.com DNS does not resolve — site is offline/defunct.
+    # Scraper will gracefully yield nothing when the site is unreachable.
 
     async def scrape_all(self) -> AsyncIterator[Drug]:
         urls = set()
+
+        # First check if site is reachable
+        try:
+            page = await self.fetch_page(f"{self.base_url}/")
+            if page.status not in (200, 301, 302):
+                logger.warning(f"BDDrugstore: site returned {page.status}, skipping")
+                return
+        except Exception as e:
+            logger.warning(f"BDDrugstore: site unreachable ({e}), skipping")
+            return
 
         # Navigate drug index
         index_paths = ["/drug", "/drugs", "/medicine", "/brand", "/generic"]
