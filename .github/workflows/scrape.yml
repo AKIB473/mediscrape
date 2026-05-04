@@ -180,7 +180,7 @@ jobs:
         if: matrix.shard.needs_playwright
         run: |
           pip install playwright
-          python -m playwright install chromium
+          python -m playwright install chromium --with-deps
 
       - name: Run shard
         env:

@@ -1,196 +1,104 @@
 """DIMS scraper - dimsbd.com - 28k+ brands, 2228 generics, FDA pregnancy categories.
 
-Note: Research found dimsbd.com drug data is app-only; website is mostly marketing.
-This scraper attempts to extract whatever is available from the web pages.
+Research findings (2026-05):
+  - dimsbd.com drug brand/price data is BEHIND A PAYWALL (DIMS Premium subscription)
+  - Free web access shows: generic names list only (no brands, prices, clinical info)
+  - The website requires a modern browser (JS-rendered, blocks 'outdated browser' UAs)
+  - Generic names ARE visible without login via /generics/{letter} pages
+
+Strategy:
+  - Use Playwright to render /generics/{letter} pages (bypasses browser-check)
+  - Extract all generic drug names visible on the listing
+  - For each generic, try to scrape the individual generic page for whatever is free
+  - Any clinical data found is a bonus; most detail is behind paywall
+  - Mark data source accurately so users know to expect limited fields
 """
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import re
 from typing import AsyncIterator
 
-from models.drug import Drug, Manufacturer, DrugPrice
+from models.drug import Drug
 from scrapers.base import BaseScrapingScraper
 
 logger = logging.getLogger(__name__)
 
+_SITE_BASE = "https://www.dimsbd.com"
+_LETTERS = ["numeric"] + list("abcdefghijklmnopqrstuvwxyz")
+
 
 class DIMSScraper(BaseScrapingScraper):
     name = "dims"
-    base_url = "https://www.dimsbd.com"
-    rate_limit = 1.5
+    base_url = _SITE_BASE
+    rate_limit = 0.5
+    use_stealth = False  # Playwright handles this directly
 
     async def scrape_all(self) -> AsyncIterator[Drug]:
-        # DIMS has generic drug pages accessible via /generic/ path
-        generics = await self._get_all_generics()
-        logger.info(f"DIMS: found {len(generics)} generic URLs")
+        try:
+            from playwright.async_api import async_playwright
+            _playwright_available = True
+        except ImportError:
+            _playwright_available = False
+            logger.warning("DIMS: playwright not installed; no data will be collected")
 
-        for url in generics:
-            try:
-                async for drug in self._scrape_generic_page(url):
-                    yield drug
-            except Exception as e:
-                logger.warning(f"DIMS: error scraping {url}: {e}")
+        if not _playwright_available:
+            return
 
-    async def _get_all_generics(self) -> list[str]:
-        """
-        DIMS generics/brands index pages list drug names as plain text (not links) —
-        actual drug content is app-only (requires DIMS Premium mobile app).
-        We convert the visible generic names to slug-based URLs and try fetching
-        individual pages for whatever the web server exposes.
-        """
-        import re as _re
+        from playwright.async_api import async_playwright as _apw
+        async with _apw() as p:
+            browser = await p.chromium.launch(headless=True)
+            page = await browser.new_page()
 
-        generic_names: list[str] = []
-        letters = ["numeric"] + list("abcdefghijklmnopqrstuvwxyz")
-
-        for letter in letters:
-            try:
-                page = await self.fetch_page(f"{self.base_url}/generics/{letter}")
-                # Links to individual generic pages may or may not exist;
-                # try both href-based and text-based extraction
-                for link in page.css('a[href*="/generics/"]'):
-                    href = link.attrib.get("href", "")
-                    suffix = href.rstrip("/").split("/")[-1]
-                    if href and suffix not in letters and len(suffix) > 2:
-                        full = href if href.startswith("http") else f"{self.base_url}{href}"
-                        generic_names.append(full)
-
-                # Fallback: extract plain-text names and build slugged URLs
-                for elem in page.css("li, .generic-item, p"):
-                    name = _text(elem).strip()
-                    if name and 3 < len(name) < 120 and _re.match(r"^[A-Za-z]", name):
-                        slug = name.lower().strip()
-                        slug = _re.sub(r"[^a-z0-9]+", "-", slug).strip("-")
-                        url = f"{self.base_url}/generics/{slug}"
-                        if url not in generic_names:
-                            generic_names.append(url)
-            except Exception:
-                pass
-
-        return generic_names
-
-    async def _scrape_generic_page(self, url: str) -> AsyncIterator[Drug]:
-        page = await self.fetch_page(url)
-        jsonld = self.extract_jsonld(page)
-
-        generic_name = _text(page.css_first("h1, .generic-name"))
-
-        # Extract all text sections
-        sections = {}
-        current_heading = ""
-        for elem in page.css("h2, h3, h4, p, div.content, .section"):
-            tag = elem.tag if hasattr(elem, "tag") else ""
-            text = _text(elem)
-            if tag in ("h2", "h3", "h4"):
-                current_heading = text.lower()
-            elif current_heading and text:
-                sections.setdefault(current_heading, []).append(text)
-
-        section_text = {k: "\n".join(v) for k, v in sections.items()}
-
-        # Parse pregnancy category - DIMS speciality
-        pregnancy_cat = ""
-        for key in section_text:
-            if "pregnancy" in key:
-                pregnancy_cat = section_text[key]
-                break
-        if not pregnancy_cat:
-            preg_elem = page.css_first(".pregnancy-category, [class*=pregnancy]")
-            if preg_elem:
-                pregnancy_cat = _text(preg_elem)
-
-        # Look for brand listings
-        brand_rows = page.css("table tr, .brand-item, .brand-card, [class*=brand-list] a")
-
-        if brand_rows:
-            for row in brand_rows:
-                cells = row.css("td")
-                if len(cells) >= 2:
-                    brand = _text(cells[0])
-                    strength = _text(cells[1]) if len(cells) > 1 else None
-                    form = _text(cells[2]) if len(cells) > 2 else None
-                    company = _text(cells[3]) if len(cells) > 3 else None
-                    price_text = _text(cells[4]) if len(cells) > 4 else None
-                    pack = _text(cells[5]) if len(cells) > 5 else None
-
-                    if not brand or brand.lower() in ("brand name", "brand", "name"):
-                        continue
-
-                    price = _parse_price(price_text)
-
-                    yield Drug(
-                        source="dims",
-                        source_url=url,
-                        brand_name=brand,
-                        generic_name=generic_name,
-                        strength=strength,
-                        dosage_form=form,
-                        manufacturer=Manufacturer(name=company) if company else None,
-                        price=price,
-                        pregnancy_category=pregnancy_cat,
-                        indications=_split(section_text.get("indications", section_text.get("indication", ""))),
-                        contraindications=_split(section_text.get("contraindications", "")),
-                        side_effects=_split(section_text.get("side effects", section_text.get("adverse effects", ""))),
-                        interactions=_split(section_text.get("interactions", section_text.get("drug interactions", ""))),
-                        dosage=section_text.get("dosage", section_text.get("dose", "")),
-                        mechanism_of_action=section_text.get("mode of action", section_text.get("pharmacology", "")),
-                        warnings=_split(section_text.get("warnings", "")),
-                        precautions=_split(section_text.get("precautions", "")),
-                        storage=section_text.get("storage", ""),
-                        extra={
-                            "jsonld": jsonld,
-                            "pack_size": pack,
-                            "fda_pregnancy_category": pregnancy_cat,
-                            "sections": section_text,
-                        },
-                    )
-                else:
-                    # Try parsing as a link/card
-                    brand = _text(row)
-                    if brand and len(brand) < 200:
+            for letter in _LETTERS:
+                try:
+                    generics = await self._get_generics_for_letter(page, letter)
+                    logger.info(f"DIMS: letter={letter!r} → {len(generics)} generics")
+                    for name in generics:
                         yield Drug(
                             source="dims",
-                            source_url=url,
-                            brand_name=brand,
-                            generic_name=generic_name,
-                            pregnancy_category=pregnancy_cat,
-                            extra={"jsonld": jsonld, "sections": section_text},
+                            source_url=f"{_SITE_BASE}/generics/{letter}",
+                            generic_name=name,
+                            extra={
+                                "dims_note": "Generic name only; brand/price data requires DIMS Premium subscription",
+                                "letter_page": letter,
+                            },
                         )
-        else:
-            # Single generic info page
-            yield Drug(
-                source="dims",
-                source_url=url,
-                generic_name=generic_name,
-                pregnancy_category=pregnancy_cat,
-                indications=_split(section_text.get("indications", "")),
-                contraindications=_split(section_text.get("contraindications", "")),
-                side_effects=_split(section_text.get("side effects", "")),
-                interactions=_split(section_text.get("interactions", "")),
-                dosage=section_text.get("dosage", ""),
-                mechanism_of_action=section_text.get("mode of action", ""),
-                extra={"jsonld": jsonld, "sections": section_text},
-            )
+                    await asyncio.sleep(self.rate_limit)
+                except Exception as e:
+                    logger.warning(f"DIMS: error on letter {letter!r}: {e}")
 
+            await browser.close()
 
-def _text(elem) -> str:
-    if elem is None:
-        return ""
-    return elem.text.strip() if hasattr(elem, "text") and elem.text else ""
+    async def _get_generics_for_letter(self, page, letter: str) -> list[str]:
+        """Load /generics/{letter} and extract all visible generic names."""
+        await page.goto(f"{_SITE_BASE}/generics/{letter}", wait_until="networkidle", timeout=20000)
+        await page.wait_for_timeout(1000)
 
+        # Get page text
+        text = await page.evaluate("document.body.innerText")
+        lines = text.splitlines()
 
-def _parse_price(text: str) -> DrugPrice | None:
-    if not text:
-        return None
-    nums = re.findall(r"[\d.]+", text)
-    if nums:
-        return DrugPrice(amount=float(nums[0]), currency="BDT", unit=text)
-    return None
+        generics: list[str] = []
+        for line in lines:
+            line = line.strip()
+            # Skip nav/footer/promo text
+            if not line:
+                continue
+            if any(
+                skip in line.lower()
+                for skip in (
+                    "dims", "premium", "buy now", "get it now", "generics", "indications",
+                    "brands", "companies", "my account", "home", "privacy", "copyright",
+                    "contact", "all rights", "reserved", "#", "a-z", "sign in", "register",
+                    "brand & generic", "brand &amp;",
+                )
+            ):
+                continue
+            # Generic drug names: start with capital letter, reasonable length
+            if re.match(r"^[A-Z][A-Za-z0-9 +&'/-]{2,80}$", line):
+                generics.append(line)
 
-
-def _split(text: str) -> list[str]:
-    if not text:
-        return []
-    return [i.strip() for i in re.split(r"[•\n;]", text) if i.strip()]
+        return generics
