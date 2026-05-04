@@ -1,6 +1,20 @@
-"""DGDA scraper - dgda.gov.bd - Official govt drug prices, registered drugs.
+"""DGDA scraper - dgda.gov.bd - Official govt drug registration database.
 
-Note: DGDA site has known SSL certificate issues. May need verify=False.
+Verified structure (2026-05):
+  Primary DB: http://180.211.137.202:9310/Allopathic/
+  Tabs:
+    ?Generic_List_With_DCC_Number  - generic names + DCC numbers (DataTables)
+    ?Medicine_Information          - full drug info table
+    ?Trade_Wise_Search             - brand-name search
+    ?Generic_Wise_Search           - generic search
+    ?Company_Wise_Search           - manufacturer search
+    ?Company_Information           - company details
+
+  OtherTMS: http://180.211.137.202:9310/OtherTMS/
+    (same structure for herbal/homeopathic/unani)
+
+  Page protection: right-click + F12 disabled via JS (no API auth needed).
+  DataTables renders the HTML table server-side, so full data is in the page HTML.
 """
 
 from __future__ import annotations
@@ -14,142 +28,180 @@ from scrapers.base import BaseScrapingScraper
 
 logger = logging.getLogger(__name__)
 
+# DGDA internal IP-based database (accessible publicly)
+_ALLOPATHIC_BASE = "http://180.211.137.202:9310/Allopathic"
+_OTHERTMS_BASE   = "http://180.211.137.202:9310/OtherTMS"
+
+# Canonical DGDA domain (used as source_url prefix)
+_CANONICAL_URL = "https://dgda.gov.bd"
+
 
 class DGDAScraper(BaseScrapingScraper):
     name = "dgda"
-    base_url = "https://dgda.gov.bd"
-    rate_limit = 2.0  # Be very polite to govt site
-    use_stealth = True  # Govt sites can be finicky
+    base_url = _ALLOPATHIC_BASE
+    rate_limit = 1.5
+    use_stealth = False  # Plain HTTP, no JS needed
 
     async def scrape_all(self) -> AsyncIterator[Drug]:
-        # DGDA has drug search at /service/drug-search or similar
-        # Try to find drug listing pages
-        drug_urls = await self._get_drug_urls()
-        logger.info(f"DGDA: found {len(drug_urls)} drug URLs")
+        # 1. Scrape Medicine_Information table (most complete: brand + generic + company + price)
+        count = 0
+        async for drug in self._scrape_table(
+            url=f"{_ALLOPATHIC_BASE}/?Medicine_Information",
+            source_label="dgda-allopathic",
+        ):
+            yield drug
+            count += 1
 
-        for url in drug_urls:
-            try:
-                drug = await self._scrape_drug_page(url)
-                if drug:
-                    yield drug
-            except Exception as e:
-                logger.warning(f"DGDA: error scraping {url}: {e}")
+        logger.info(f"DGDA: allopathic medicine table yielded {count} drugs")
 
-    async def _get_drug_urls(self) -> list[str]:
-        urls = set()
+        # 2. Scrape Generic list for DCC numbers (supplementary)
+        gen_count = 0
+        async for drug in self._scrape_table(
+            url=f"{_ALLOPATHIC_BASE}/?Generic_List_With_DCC_Number",
+            source_label="dgda-generic",
+            generic_only=True,
+        ):
+            yield drug
+            gen_count += 1
 
-        # Try the main drug search/list pages
-        search_paths = [
-            "/service/drug-search",
-            "/services/drug",
-            "/drug",
-            "/medicine",
-            "/registered-drugs",
-        ]
+        logger.info(f"DGDA: generic list yielded {gen_count} entries")
 
-        for path in search_paths:
-            try:
-                page = await self.fetch_page(f"{self.base_url}{path}")
-                # Look for drug links
-                for link in page.css("a"):
-                    href = link.attrib.get("href", "")
-                    if any(kw in href.lower() for kw in ["/drug/", "/medicine/", "/product/"]):
-                        full = href if href.startswith("http") else f"{self.base_url}{href}"
-                        urls.add(full)
+        # 3. OtherTMS (herbal/homeopathic/unani)
+        other_count = 0
+        async for drug in self._scrape_table(
+            url=f"{_OTHERTMS_BASE}/?Medicine_Information",
+            source_label="dgda-other",
+        ):
+            yield drug
+            other_count += 1
 
-                # Check for pagination
-                next_links = page.css('a[rel="next"], .pagination a, .next a')
-                for nl in next_links:
-                    href = nl.attrib.get("href", "")
-                    if href:
-                        try:
-                            next_page = await self.fetch_page(
-                                href if href.startswith("http") else f"{self.base_url}{href}"
-                            )
-                            for link in next_page.css("a"):
-                                h = link.attrib.get("href", "")
-                                if any(kw in h.lower() for kw in ["/drug/", "/medicine/"]):
-                                    full = h if h.startswith("http") else f"{self.base_url}{h}"
-                                    urls.add(full)
-                        except Exception:
-                            pass
-            except Exception:
-                pass
+        logger.info(f"DGDA: OtherTMS medicine table yielded {other_count} drugs")
 
-        # Try scraping drug price list pages
+    async def _scrape_table(
+        self,
+        url: str,
+        source_label: str,
+        generic_only: bool = False,
+    ) -> AsyncIterator[Drug]:
+        """Parse a DGDA DataTable page and yield Drug objects from each row."""
         try:
-            page = await self.fetch_page(f"{self.base_url}")
-            # Look for any link containing drug/medicine/price
-            for link in page.css("a"):
-                href = link.attrib.get("href", "")
-                text = _text(link).lower()
-                if any(kw in text for kw in ["drug", "medicine", "price"]):
-                    full = href if href.startswith("http") else f"{self.base_url}{href}"
-                    urls.add(full)
-        except Exception:
-            pass
+            page = await self.fetch_page(url)
+        except Exception as e:
+            logger.warning(f"DGDA: failed to fetch {url}: {e}")
+            return
 
-        return list(urls)
+        # DataTables renders as <table id="example"> with <thead> and <tbody>
+        table = page.css_first("table#example, table.dataTable, table")
+        if not table:
+            logger.warning(f"DGDA: no table found at {url}")
+            return
 
-    async def _scrape_drug_page(self, url: str) -> Drug | None:
-        page = await self.fetch_page(url)
-        jsonld = self.extract_jsonld(page)
+        # Parse header row to map column names → indices
+        headers: list[str] = []
+        for th in table.css("thead th, thead td"):
+            headers.append(_text(th).lower().strip())
 
-        # Try to extract data from table rows
-        tables = page.css("table")
-        for table in tables:
-            rows = table.css("tr")
-            for row in rows:
-                cells = row.css("td, th")
-                if len(cells) >= 3:
-                    data = {_text(cells[0]).lower(): _text(cells[1])}
+        if not headers:
+            # Try first <tr> as header
+            first_row = table.css_first("tr")
+            if first_row:
+                for cell in first_row.css("th, td"):
+                    headers.append(_text(cell).lower().strip())
 
-        # Extract key-value pairs from the page
-        fields = {}
-        for dt in page.css("dt, .label, th"):
-            key = _text(dt).lower().strip().rstrip(":")
-            dd = dt.css_first("+ dd, + td")
-            if dd:
-                fields[key] = _text(dd)
+        logger.debug(f"DGDA [{source_label}]: headers = {headers}")
 
-        # Try extracting from any structured layout
-        title = _text(page.css_first("h1, h2, .title, .drug-name"))
+        # Column index helpers
+        def col(name: str, *aliases: str) -> int:
+            for candidate in (name, *aliases):
+                for i, h in enumerate(headers):
+                    if candidate in h:
+                        return i
+            return -1
 
-        brand_name = fields.get("brand name", fields.get("brand", title))
-        generic_name = fields.get("generic name", fields.get("generic", fields.get("molecule", "")))
-        dosage_form = fields.get("dosage form", fields.get("form", ""))
-        strength = fields.get("strength", fields.get("dose", ""))
-        manufacturer_name = fields.get("manufacturer", fields.get("company", fields.get("marketing company", "")))
-        price_text = fields.get("price", fields.get("mrp", fields.get("unit price", "")))
-        reg_no = fields.get("registration no", fields.get("dar no", fields.get("registration number", "")))
+        idx_brand      = col("brand", "trade", "medicine name", "product name")
+        idx_generic    = col("generic", "molecule", "inn")
+        idx_company    = col("company", "manufacturer", "firm")
+        idx_strength   = col("strength", "dose")
+        idx_form       = col("form", "dosage form", "type")
+        idx_price      = col("price", "mrp", "unit price")
+        idx_reg        = col("reg", "dcc", "registration", "dar no")
+        idx_category   = col("category", "group", "class")
 
-        if not brand_name and not generic_name:
-            return None
+        rows_yielded = 0
+        for row in table.css("tbody tr"):
+            cells = row.css("td")
+            if not cells:
+                continue
 
-        price = _parse_price(price_text) if price_text else None
+            def cell(idx: int) -> str:
+                if 0 <= idx < len(cells):
+                    return _text(cells[idx])
+                return ""
 
-        return Drug(
-            source="dgda",
-            source_url=url,
-            brand_name=brand_name,
-            generic_name=generic_name,
-            dosage_form=dosage_form,
-            strength=strength,
-            manufacturer=Manufacturer(name=manufacturer_name, country="Bangladesh") if manufacturer_name else None,
-            price=price,
-            registration_number=reg_no,
-            extra={
-                "jsonld": jsonld,
-                "all_fields": fields,
-                "official_govt_data": True,
-            },
-        )
+            if generic_only:
+                generic_name = cell(0) or cell(1)
+                dcc_number   = cell(idx_reg) if idx_reg >= 0 else ""
+                if not generic_name:
+                    continue
+                yield Drug(
+                    source="dgda",
+                    source_url=_CANONICAL_URL,
+                    generic_name=generic_name,
+                    registration_number=dcc_number,
+                    categories=["Bangladesh", "DGDA", "Allopathic"],
+                    extra={
+                        "source_label": source_label,
+                        "official_govt_data": True,
+                        "dcc_number": dcc_number,
+                    },
+                )
+                rows_yielded += 1
+                continue
+
+            # Full medicine row
+            brand_name  = cell(idx_brand)  if idx_brand  >= 0 else cell(0)
+            generic_name = cell(idx_generic) if idx_generic >= 0 else cell(1)
+            company     = cell(idx_company) if idx_company >= 0 else ""
+            strength    = cell(idx_strength) if idx_strength >= 0 else ""
+            form        = cell(idx_form)   if idx_form   >= 0 else ""
+            price_text  = cell(idx_price)  if idx_price  >= 0 else ""
+            reg_no      = cell(idx_reg)    if idx_reg    >= 0 else ""
+            category    = cell(idx_category) if idx_category >= 0 else ""
+
+            if not brand_name and not generic_name:
+                continue
+
+            price = _parse_price(price_text)
+
+            yield Drug(
+                source="dgda",
+                source_url=_CANONICAL_URL,
+                brand_name=brand_name or None,
+                generic_name=generic_name or None,
+                strength=strength or None,
+                dosage_form=form or None,
+                registration_number=reg_no or None,
+                manufacturer=Manufacturer(name=company, country="Bangladesh") if company else None,
+                price=price,
+                therapeutic_class=category or None,
+                categories=["Bangladesh", "DGDA", source_label.split("-")[-1].title()],
+                extra={
+                    "source_label": source_label,
+                    "official_govt_data": True,
+                    "reg_number": reg_no,
+                    "raw_row": [_text(c) for c in cells],
+                },
+            )
+            rows_yielded += 1
+
+        logger.info(f"DGDA [{source_label}]: parsed {rows_yielded} rows from {url}")
 
 
 def _text(elem) -> str:
     if elem is None:
         return ""
-    return elem.text.strip() if hasattr(elem, "text") and elem.text else ""
+    t = elem.text if hasattr(elem, "text") else ""
+    return (t or "").strip()
 
 
 def _parse_price(text: str) -> DrugPrice | None:

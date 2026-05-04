@@ -22,14 +22,19 @@ class BDDrugstoreScraper(BaseScrapingScraper):
     async def scrape_all(self) -> AsyncIterator[Drug]:
         urls = set()
 
-        # First check if site is reachable
+        # Fast DNS/reachability check via httpx (bypasses scrapling's 3-attempt retry)
         try:
-            page = await self.fetch_page(f"{self.base_url}/")
-            if page.status not in (200, 301, 302):
-                logger.warning(f"BDDrugstore: site returned {page.status}, skipping")
-                return
-        except Exception as e:
+            import httpx
+            async with httpx.AsyncClient(timeout=6, follow_redirects=True) as _c:
+                _r = await _c.get(f"{self.base_url}/")
+        except httpx.ConnectError as e:
             logger.warning(f"BDDrugstore: site unreachable ({e}), skipping")
+            return
+        except Exception as e:
+            logger.warning(f"BDDrugstore: connection failed ({e}), skipping")
+            return
+        if _r.status_code not in (200, 301, 302, 403):
+            logger.warning(f"BDDrugstore: site returned {_r.status_code}, skipping")
             return
 
         # Navigate drug index

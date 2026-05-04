@@ -22,11 +22,13 @@ class BDDrugsScraper(BaseScrapingScraper):
     async def scrape_all(self) -> AsyncIterator[Drug]:
         urls = set()
 
-        # First check if site is reachable at all
+        # Fast reachability check via httpx (bypasses scrapling's 3-attempt retry)
         try:
-            page = await self.fetch_page(f"{self.base_url}/")
-            if page.status not in (200, 301, 302):
-                logger.warning(f"BDDrugs: site returned {page.status}, skipping")
+            import httpx
+            async with httpx.AsyncClient(timeout=8, follow_redirects=True) as _c:
+                _r = await _c.get(f"{self.base_url}/")
+            if _r.status_code not in (200, 301, 302, 403):
+                logger.warning(f"BDDrugs: site returned {_r.status_code}, skipping")
                 return
         except Exception as e:
             logger.warning(f"BDDrugs: site unreachable ({e}), skipping")
