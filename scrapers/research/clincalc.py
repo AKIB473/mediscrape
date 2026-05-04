@@ -121,20 +121,43 @@ class ClinCalcScraper(BaseScrapingScraper):
             )
 
     async def _scrape_detail(self, url: str) -> dict:
+        import re as _re
         page = await self.fetch_page(url)
+        page_html = page.text if hasattr(page, 'text') else ''
         data = {}
 
-        # Extract drug details
-        fields = {}
-        for row in page.css("tr, .detail-item"):
-            label = _text(row.css_first("th, .label, dt"))
-            value = _text(row.css_first("td, .value, dd"))
-            if label and value:
-                fields[label.lower().strip().rstrip(":")] = value
+        # Parse via regex on raw HTML (more reliable than CSS on _HTMLPage)
+        if page_html:
+            # Key-value table rows: <th>Label</th><td>Value</td>
+            kv = _re.findall(
+                r'<th[^>]*>([^<]{2,60})</th>\s*<td[^>]*>([^<]{2,200})</td>',
+                page_html, _re.IGNORECASE
+            )
+            fields = {k.strip().lower().rstrip(':'): v.strip() for k,v in kv}
+            # Also try definition lists
+            dts = _re.findall(r'<dt[^>]*>([^<]{2,60})</dt>\s*<dd[^>]*>([^<]{2,200})</dd>', page_html)
+            for k,v in dts:
+                fields[k.strip().lower()] = v.strip()
 
-        data["generic_name"] = fields.get("generic name", "")
-        data["drug_class"] = fields.get("drug class", fields.get("class", ""))
-        data["clinical_use"] = fields.get("clinical use", fields.get("indication", ""))
+            data['generic_name'] = (
+                fields.get('generic name') or
+                fields.get('generic') or
+                fields.get('nonproprietary name') or ''
+            )
+            data['drug_class'] = fields.get('drug class', fields.get('class', ''))
+            data['clinical_use'] = fields.get('clinical use', fields.get('indication', ''))
+            data['atc_code'] = fields.get('atc code', fields.get('atc', ''))
+        else:
+            # CSS fallback
+            fields = {}
+            for row in page.css("tr, .detail-item"):
+                label = _text(row.css_first("th, .label, dt"))
+                value = _text(row.css_first("td, .value, dd"))
+                if label and value:
+                    fields[label.lower().strip().rstrip(":")] = value
+            data["generic_name"] = fields.get("generic name", "")
+            data["drug_class"] = fields.get("drug class", fields.get("class", ""))
+            data["clinical_use"] = fields.get("clinical use", fields.get("indication", ""))
 
         # Parse yearly data from tables/charts
         yearly_data = {}

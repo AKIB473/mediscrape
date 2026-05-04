@@ -175,7 +175,7 @@ jobs:
       - name: Install dependencies
         run: |
           pip install -e .
-          pip install curl_cffi cloudscraper
+          pip install curl_cffi cloudscraper beautifulsoup4
 
       - name: Install Playwright (stealth shards only)
         if: matrix.shard.needs_playwright
@@ -248,7 +248,7 @@ jobs:
           done
 
       - name: Install pipeline deps
-        run: pip install -e . && pip install curl_cffi cloudscraper orjson
+        run: pip install -e . && pip install curl_cffi cloudscraper beautifulsoup4 orjson
 
       - name: Post-process (normalize + merge + build DB)
         run: python main.py post-process --data-dir data
@@ -282,7 +282,7 @@ jobs:
           cache: 'pip'
 
       - name: Install pipeline deps
-        run: pip install -e . && pip install curl_cffi cloudscraper
+        run: pip install -e . && pip install curl_cffi cloudscraper beautifulsoup4
 
       - name: Post-process (normalize + merge + build DB)
         run: python main.py post-process --data-dir data

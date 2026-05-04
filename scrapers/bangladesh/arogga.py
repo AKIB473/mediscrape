@@ -75,7 +75,7 @@ class AroggaScraper(BaseScrapingScraper):
         for url in urls:
             try:
                 drug = await self._scrape_product_page(url)
-                if drug:
+                if drug and self._is_medicine(drug):
                     yield drug
             except Exception as e:
                 logger.warning(f"Arogga: error scraping {url}: {e}")
@@ -225,6 +225,40 @@ class AroggaScraper(BaseScrapingScraper):
                 )
             },
         )
+
+    @staticmethod
+    def _is_medicine(drug) -> bool:
+        """
+        Filter out non-medicine products (cosmetics, food, household items).
+        Arogga sells everything — we only want actual drugs/medicines.
+        """
+        # Keep if has generic name or pharma-related therapeutic class
+        if drug.generic_name:
+            return True
+        # Skip obvious non-medicine categories
+        skip_categories = {
+            'home_care', 'baby_care', 'personal_care', 'beauty', 'food',
+            'grocery', 'cosmetics', 'household', 'toy', 'electronics',
+            'perfume', 'fragrance', 'clothing', 'stationery',
+        }
+        for cat in (drug.categories or []):
+            if cat.lower().replace(' ', '_') in skip_categories:
+                return False
+        # Skip if brand name contains strong non-medicine keywords
+        non_med = [
+            'detergent', 'soap bar', 'shampoo', 'conditioner', 'perfume', 'cologne',
+            'deodorant', 'lipstick', 'mascara', 'foundation', 'blush', 'eyeliner',
+            'nail polish', 'hair color', 'hair dye', 'face wash', 'body lotion',
+            'condom', 'sanitary', 'diaper', 'baby wipes', 'tissue', 'candy',
+            'chocolate', 'biscuit', 'juice', 'energy drink', 'protein powder',
+            'marshmallow', 'haribo', 'toy', 'remote control',
+        ]
+        name_lower = (drug.brand_name or '').lower()
+        for kw in non_med:
+            if kw in name_lower:
+                return False
+        # Keep everything else (medicines, supplements, medical devices)
+        return True
 
     # ------------------------------------------------------------------ #
     # Strategy 2: Sitemap                                                  #
