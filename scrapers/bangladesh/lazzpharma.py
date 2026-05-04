@@ -114,34 +114,61 @@ class LazzPharmaScraper(BaseScrapingScraper):
     async def _get_drug_urls(self) -> list[str]:
         urls = set()
 
-        # Category-based navigation
-        cat_paths = ["/shop", "/product-category/medicine", "/medicines", "/products"]
-        for path in cat_paths:
-            try:
-                page = await self.fetch_page(f"{self.base_url}{path}")
-                for link in page.css('a[href*="/product/"]'):
-                    href = link.attrib.get("href", "")
-                    if href:
-                        full = href if href.startswith("http") else f"{self.base_url}{href}"
-                        urls.add(full)
+        # Primary: XML sitemap (LazzPharma has /sitemap/product.xml)
+        try:
+            sitemap_page = await self.fetch_page(f"{self.base_url}/sitemap.xml")
+            sitemap_text = sitemap_page.text if hasattr(sitemap_page, "text") else ""
+            import re as _re
+            # Find product sitemap from index
+            product_sitemaps = _re.findall(
+                r"<loc>(https?://[^<]+/sitemap/product[^<]*\.xml)</loc>", sitemap_text
+            )
+            if not product_sitemaps:
+                product_sitemaps = _re.findall(
+                    r"<loc>(https?://[^<]+sitemap[^<]*\.xml)</loc>", sitemap_text
+                )
 
-                # Pagination
-                for pg in range(2, 100):
-                    try:
-                        pg_page = await self.fetch_page(f"{self.base_url}{path}/page/{pg}/")
-                        found = 0
-                        for link in pg_page.css('a[href*="/product/"]'):
-                            href = link.attrib.get("href", "")
-                            if href:
-                                full = href if href.startswith("http") else f"{self.base_url}{href}"
-                                urls.add(full)
-                                found += 1
-                        if found == 0:
+            for sm_url in product_sitemaps:
+                try:
+                    sm_page = await self.fetch_page(sm_url)
+                    sm_text = sm_page.text if hasattr(sm_page, "text") else ""
+                    for loc in _re.findall(r"<loc>(https?://[^<]+/product/[^<]+)</loc>", sm_text):
+                        urls.add(loc)
+                    logger.info(f"LazzPharma: {sm_url} → {len(urls)} product URLs")
+                except Exception as e:
+                    logger.warning(f"LazzPharma: sitemap {sm_url} failed: {e}")
+        except Exception as e:
+            logger.warning(f"LazzPharma: sitemap discovery failed: {e}")
+
+        # Secondary: WooCommerce category/shop pagination (fallback)
+        if not urls:
+            cat_paths = ["/shop", "/product-category/medicine", "/medicines", "/products"]
+            for path in cat_paths:
+                try:
+                    page = await self.fetch_page(f"{self.base_url}{path}")
+                    for link in page.css('a[href*="/product/"]'):
+                        href = link.attrib.get("href", "")
+                        if href:
+                            full = href if href.startswith("http") else f"{self.base_url}{href}"
+                            urls.add(full)
+
+                    # Pagination
+                    for pg in range(2, 100):
+                        try:
+                            pg_page = await self.fetch_page(f"{self.base_url}{path}/page/{pg}/")
+                            found = 0
+                            for link in pg_page.css('a[href*="/product/"]'):
+                                href = link.attrib.get("href", "")
+                                if href:
+                                    full = href if href.startswith("http") else f"{self.base_url}{href}"
+                                    urls.add(full)
+                                    found += 1
+                            if found == 0:
+                                break
+                        except Exception:
                             break
-                    except Exception:
-                        break
-            except Exception:
-                pass
+                except Exception:
+                    pass
 
         return list(urls)
 

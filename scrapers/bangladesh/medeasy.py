@@ -15,8 +15,9 @@ logger = logging.getLogger(__name__)
 class MedEasyScraper(BaseScrapingScraper):
     name = "medeasy"
     base_url = "https://medeasy.health"
-    rate_limit = 1.0
+    rate_limit = 1.5
     use_stealth = True
+    use_dynamic = True  # Full Next.js CSR; needs Playwright to hydrate product data
 
     async def scrape_all(self) -> AsyncIterator[Drug]:
         # Try API discovery first
@@ -93,20 +94,30 @@ class MedEasyScraper(BaseScrapingScraper):
 
     async def _get_drug_urls(self) -> list[str]:
         urls = set()
-        for page_num in range(1, 50):
-            try:
-                page = await self.fetch_page(f"{self.base_url}/medicines?page={page_num}")
-                found = 0
-                for link in page.css('a[href*="/medicine/"]'):
-                    href = link.attrib.get("href", "")
-                    if href:
-                        full = href if href.startswith("http") else f"{self.base_url}{href}"
-                        urls.add(full)
-                        found += 1
-                if found == 0:
+        # MedEasy is fully CSR — try multiple listing paths with Playwright
+        listing_paths = [
+            "/medicines", "/products", "/pharmacy", "/shop",
+            "/category/medicine", "/all-medicines",
+        ]
+        for path in listing_paths:
+            for page_num in range(1, 30):
+                try:
+                    page = await self.fetch_page(
+                        f"{self.base_url}{path}?page={page_num}"
+                    )
+                    found = 0
+                    for link in page.css(
+                        'a[href*="/medicine/"], a[href*="/product/"], a[href*="/drug/"]'
+                    ):
+                        href = link.attrib.get("href", "")
+                        if href:
+                            full = href if href.startswith("http") else f"{self.base_url}{href}"
+                            urls.add(full)
+                            found += 1
+                    if found == 0:
+                        break
+                except Exception:
                     break
-            except Exception:
-                break
         return list(urls)
 
     async def _scrape_drug_page(self, url: str) -> Drug | None:

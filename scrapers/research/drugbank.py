@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import re
 from typing import AsyncIterator
 
@@ -15,8 +16,12 @@ logger = logging.getLogger(__name__)
 class DrugBankScraper(BaseScrapingScraper):
     name = "drugbank"
     base_url = "https://go.drugbank.com"
-    rate_limit = 2.0
+    rate_limit = 3.0  # DrugBank is strict; 3 s between requests
     use_stealth = True
+
+    # Max pages to paginate — DrugBank has ~100 pages of approved drugs.
+    # Keep this low in default (non-fullscrape) mode to respect rate limits.
+    _default_max_pages = int(os.getenv("DRUGBANK_MAX_PAGES", "100"))
 
     async def scrape_all(self) -> AsyncIterator[Drug]:
         urls = await self._get_drug_urls()
@@ -31,25 +36,39 @@ class DrugBankScraper(BaseScrapingScraper):
                 logger.warning(f"DrugBank: error scraping {url}: {e}")
 
     async def _get_drug_urls(self) -> list[str]:
-        urls = set()
+        urls: dict[str, None] = {}  # ordered set via dict
 
-        # DrugBank has paginated drug list
-        for page_num in range(1, 300):
+        # DrugBank lists approved drugs at /drugs?approved=1, sorted by name.
+        # Each page has ~25 drugs. Default: paginate up to _default_max_pages.
+        for page_num in range(1, self._default_max_pages + 1):
             try:
-                page = await self.fetch_page(f"{self.base_url}/drugs?page={page_num}")
+                page = await self.fetch_page(
+                    f"{self.base_url}/drugs",
+                    # StealthyFetcher.fetch() passes kwargs to playwright; pass params via URL
+                )
+                # Attempt with query string in URL directly
+                page = await self.fetch_page(
+                    f"{self.base_url}/drugs?page={page_num}&approved=1"
+                )
                 found = 0
                 for link in page.css('a[href*="/drugs/DB"]'):
                     href = link.attrib.get("href", "")
-                    if href and "/drugs/DB" in href:
+                    if href and re.search(r"/drugs/DB\d+", href):
                         full = href if href.startswith("http") else f"{self.base_url}{href}"
-                        urls.add(full)
-                        found += 1
+                        # Normalise: strip query string
+                        full = full.split("?")[0]
+                        if full not in urls:
+                            urls[full] = None
+                            found += 1
                 if found == 0:
+                    logger.debug(f"DrugBank: no new URLs on page {page_num}, stopping")
                     break
-            except Exception:
+                logger.debug(f"DrugBank: page {page_num} → {found} new URLs ({len(urls)} total)")
+            except Exception as e:
+                logger.warning(f"DrugBank: error on page {page_num}: {e}")
                 break
 
-        return list(urls)
+        return list(urls.keys())
 
     async def _scrape_drug_page(self, url: str) -> Drug | None:
         page = await self.fetch_page(url)

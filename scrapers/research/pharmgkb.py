@@ -25,19 +25,50 @@ class PharmGKBScraper(BaseAPIScraper):
     rate_limit = 0.5
 
     async def scrape_all(self) -> AsyncIterator[Drug]:
-        # PharmGKB API: use types=Drug to get all drug chemicals
-        data = await self.api_get(
-            f"{BASE}/chemical",
-            params={"types": "Drug", "view": "max"},
-        )
+        # PharmGKB API: paginate through all drug chemicals
+        # Default page size is 200; iterate until no more results
+        page = 1
+        page_size = 200
+        total_yielded = 0
 
-        items = data.get("data", [])
-        logger.info(f"PharmGKB: got {len(items)} drugs from API")
+        while True:
+            try:
+                data = await self.api_get(
+                    f"{BASE}/chemical",
+                    params={
+                        "types": "Drug,SmallMolecule",
+                        "view": "max",
+                        "pg": page,
+                        "pageSize": page_size,
+                    },
+                )
+            except Exception as e:
+                logger.error(f"PharmGKB: API error on page {page}: {e}")
+                break
 
-        for item in items:
-            drug = self._parse_chemical(item)
-            if drug:
-                yield drug
+            items = data.get("data", [])
+            if not items:
+                break
+
+            logger.info(f"PharmGKB: page {page} → {len(items)} chemicals")
+
+            for item in items:
+                drug = self._parse_chemical(item)
+                if drug:
+                    yield drug
+                    total_yielded += 1
+
+            # Check if there are more pages
+            meta = data.get("meta", {})
+            total_count = meta.get("count", 0)
+            if total_count and total_yielded >= total_count:
+                break
+            if len(items) < page_size:
+                break  # Last page
+
+            page += 1
+
+        logger.info(f"PharmGKB: scraped {total_yielded} total chemicals")
 
     def _parse_chemical(self, item: dict) -> Drug | None:
         name = item.get("name")
