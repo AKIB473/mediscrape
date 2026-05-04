@@ -52,6 +52,7 @@ from scrapers.research.pharmgkb import PharmGKBScraper
 from scrapers.research.clincalc import ClinCalcScraper
 
 from utils.change_detector import ChangeDetector
+from utils.pipeline import post_process as _post_process
 
 console = Console()
 
@@ -223,6 +224,89 @@ def check(data_dir: Path):
         console.print("[green]No changes detected.[/green]")
 
 
+@cli.command(name="post-process")
+@click.option("--data-dir", type=Path, default=Path("data"), help="Data directory")
+def post_process_cmd(data_dir: Path):
+    """Normalize + merge all sources → SQLite DB + merged JSON."""
+    import asyncio
+    from utils.pipeline import post_process
+    stats = asyncio.run(post_process(data_dir))
+    table = Table(title="Post-Process Results")
+    table.add_column("Metric")
+    table.add_column("Value", justify="right")
+    for k, v in stats.items():
+        if isinstance(v, dict):
+            for sk, sv in v.items():
+                table.add_row(f"  {k}.{sk}", str(sv))
+        else:
+            table.add_row(k, str(v))
+    console.print(table)
+
+
+@cli.command()
+@click.argument("query")
+@click.option("--data-dir", type=Path, default=Path("data"))
+@click.option("--limit", default=20, help="Max results")
+def search_db(query: str, data_dir: Path, limit: int):
+    """Search the merged drug database."""
+    import sqlite3
+    from utils.database import search
+    db_path = data_dir / "mediscrape.db"
+    if not db_path.exists():
+        console.print(f"[red]DB not found: {db_path}. Run 'post-process' first.[/red]")
+        return
+    conn = sqlite3.connect(db_path)
+    conn.row_factory = sqlite3.Row
+    results = search(conn, query, limit)
+    conn.close()
+    if not results:
+        console.print(f"[yellow]No results for '{query}'[/yellow]")
+        return
+    table = Table(title=f"Search: {query} ({len(results)} results)")
+    table.add_column("Generic Name")
+    table.add_column("Form")
+    table.add_column("Strength")
+    table.add_column("Class")
+    table.add_column("Min Price (BDT)", justify="right")
+    table.add_column("Sources", justify="right")
+    for r in results:
+        table.add_row(
+            r.get("generic_name") or "",
+            r.get("dosage_form") or "",
+            r.get("strength") or "",
+            (r.get("therapeutic_class") or "")[:30],
+            str(r.get("min_price") or ""),
+            str(r.get("source_count") or ""),
+        )
+    console.print(table)
+
+
+@cli.command()
+@click.option("--data-dir", type=Path, default=Path("data"))
+def db_stats(data_dir: Path):
+    """Show statistics about the merged drug database."""
+    import sqlite3
+    from utils.database import get_stats
+    db_path = data_dir / "mediscrape.db"
+    if not db_path.exists():
+        console.print(f"[red]DB not found: {db_path}. Run 'post-process' first.[/red]")
+        return
+    conn = sqlite3.connect(db_path)
+    conn.row_factory = sqlite3.Row
+    stats = get_stats(conn)
+    conn.close()
+    table = Table(title="Database Statistics")
+    table.add_column("Metric")
+    table.add_column("Value", justify="right")
+    for k, v in stats.items():
+        if isinstance(v, dict):
+            for sk, sv in list(v.items())[:10]:
+                table.add_row(f"  {k}: {sk}", str(sv))
+        else:
+            table.add_row(k, str(v))
+    console.print(table)
+
+
 @cli.command(name="list")
 def list_sources():
     """List all available scraper sources."""
@@ -243,6 +327,95 @@ def list_sources():
         table.add_row(name, "Research", scraper_type(name))
 
     console.print(table)
+
+
+@cli.command(name="post-process")
+@click.option("--data-dir", type=Path, default=Path("data"), help="Data directory")
+def post_process_cmd(data_dir: Path):
+    """Normalize, merge all sources, build SQLite DB and merged JSON."""
+    asyncio.run(_post_process(data_dir))
+
+
+@cli.command(name="search")
+@click.argument("query")
+@click.option("--data-dir", type=Path, default=Path("data"), help="Data directory")
+@click.option("--limit", default=20, show_default=True, help="Max results")
+def search_cmd(query: str, data_dir: Path, limit: int):
+    """Search the merged drug database."""
+    import sqlite3 as _sqlite3
+    from utils.database import search as _search
+
+    db_path = data_dir / "mediscrape.db"
+    if not db_path.exists():
+        console.print(f"[red]Database not found at {db_path}. Run 'post-process' first.[/red]")
+        sys.exit(1)
+
+    conn = _sqlite3.connect(str(db_path))
+    conn.row_factory = _sqlite3.Row
+    results = _search(conn, query, limit)
+    conn.close()
+
+    if not results:
+        console.print(f"[yellow]No results for '{query}'[/yellow]")
+        return
+
+    table = Table(title=f"Search: {query} ({len(results)} results)")
+    table.add_column("Generic Name", style="cyan")
+    table.add_column("Dosage Form")
+    table.add_column("Strength")
+    table.add_column("Brand Names")
+    table.add_column("Sources")
+    table.add_column("Min Price", justify="right")
+
+    for r in results:
+        brands = r.get("brand_names", []) if isinstance(r.get("brand_names"), list) else []
+        sources = r.get("sources", []) if isinstance(r.get("sources"), list) else []
+        table.add_row(
+            r.get("generic_name") or "",
+            r.get("dosage_form") or "",
+            r.get("strength") or "",
+            ", ".join(brands[:3]) + ("…" if len(brands) > 3 else ""),
+            ", ".join(sources),
+            f"{r['min_price']:.2f} BDT" if r.get("min_price") is not None else "",
+        )
+
+    console.print(table)
+
+
+@cli.command(name="stats")
+@click.option("--data-dir", type=Path, default=Path("data"), help="Data directory")
+def stats_cmd(data_dir: Path):
+    """Show database statistics."""
+    import sqlite3 as _sqlite3
+    from utils.database import get_stats as _get_stats
+
+    db_path = data_dir / "mediscrape.db"
+    if not db_path.exists():
+        console.print(f"[red]Database not found at {db_path}. Run 'post-process' first.[/red]")
+        sys.exit(1)
+
+    conn = _sqlite3.connect(str(db_path))
+    conn.row_factory = _sqlite3.Row
+    stats = _get_stats(conn)
+    conn.close()
+
+    table = Table(title="MediScrape Database Statistics")
+    table.add_column("Metric", style="bold")
+    table.add_column("Value", justify="right")
+
+    table.add_row("Total canonical drugs",   str(stats.get("total_drugs", 0)))
+    table.add_row("Total brand names",        str(stats.get("total_brands", 0)))
+    table.add_row("Total price records",      str(stats.get("total_prices", 0)))
+    table.add_row("Drugs with prices",        str(stats.get("drugs_with_prices", 0)))
+    table.add_row("Drugs w/ mechanism",       str(stats.get("drugs_with_mechanism", 0)))
+    table.add_row("Drugs w/ indications",     str(stats.get("drugs_with_indications", 0)))
+    table.add_row("Drugs w/ chemistry data",  str(stats.get("drugs_with_chemistry", 0)))
+    table.add_row("Active sources",           str(len(stats.get("sources", []))))
+
+    console.print(table)
+
+    if stats.get("sources"):
+        console.print("[bold]Sources:[/bold] " + ", ".join(stats["sources"]))
 
 
 if __name__ == "__main__":

@@ -247,6 +247,12 @@ jobs:
             cp -R "${src_dir}" "data/${src}"
           done
 
+      - name: Install pipeline deps
+        run: pip install -e . && pip install curl_cffi cloudscraper orjson
+
+      - name: Post-process (normalize + merge + build DB)
+        run: python main.py post-process --data-dir data
+
       - name: Rebuild checksums
         run: |
           python - <<'PY'
@@ -268,6 +274,23 @@ jobs:
           )
           print(f'Wrote {len(checksums)} checksums')
           PY
+
+      - name: Set up Python (merge job)
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install pipeline deps
+        run: pip install -e . && pip install curl_cffi cloudscraper
+
+      - name: Post-process (normalize + merge + build DB)
+        run: python main.py post-process --data-dir data
+
+      - name: Commit DB and merged JSON
+        run: |
+          git add -f data/mediscrape.db data/merged_drugs.json
+          git diff --cached --quiet || git commit --amend --no-edit
 
       - name: Check for changes
         id: changes
@@ -295,5 +318,17 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: drug-data-${{ github.run_number }}
-          path: data/
+          path: |
+            data/
+            !data/**/*.db
           retention-days: 30
+
+      - name: Upload database
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mediscrape-db-${{ github.run_number }}
+          path: |
+            data/mediscrape.db
+            data/merged_drugs.json
+          retention-days: 90

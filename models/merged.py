@@ -81,6 +81,21 @@ class MergedDrug(BaseModel):
     lactation: str | None = None
     black_box_warning: str | None = None
     overdose: str | None = None
+    storage: str | None = None
+    boxed_warning: str | None = None
+
+    # ── Chemical identifiers (cross-ref) ─────────────────────────────────────
+    molecular_formula: str | None = None
+    molecular_weight: float | None = None
+    smiles: str | None = None
+    inchi: str | None = None
+    inchi_key: str | None = None
+    cas_number: str | None = None
+    pubchem_cid: int | None = None
+    chembl_id: str | None = None
+    drugbank_id: str | None = None
+    rxcui: str | None = None
+    ndc: list[str] = Field(default_factory=list)
 
     # ── Extra ────────────────────────────────────────────────────────────────
     description: str | None = None
